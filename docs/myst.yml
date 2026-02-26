@@ -1,0 +1,27 @@
+version: 1
+extends:
+  - toc.yml
+  - abbreviations.yml
+
+project:
+  id: devflow
+  title: Devflow
+  description: A reusable developer workflow CLI for deterministic local and CI execution.
+  authors:
+    - name: Soft Mentor
+  github: https://github.com/softmentor/devflow
+
+site:
+  template: book-theme
+  nav:
+    - title: Home
+      url: /index
+    - title: Developer Guide
+      url: /developer-guide/index
+    - title: Reference
+      url: /reference
+  options:
+    url: https://softmentor.github.io/devflow/
+    folders: false
+    hide_authors: true
+    logo_text: Devflow v0.1.0

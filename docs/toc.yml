@@ -1,0 +1,20 @@
+version: 1
+project:
+  toc:
+    - file: index.md
+    - title: Developer Guide
+      file: developer-guide/index.md
+      children:
+        - title: Architecture and Design
+          file: v0.1.0-architecture-and-design-review.md
+        - title: v0.1.0 Roadmap and Decisions
+          children:
+            - file: reference/v0.1.0-platform-migration-decision.md
+            - file: reference/v0.1.0-implementation-execution-plan.md
+            - file: reference/v0.1.0-ci-container-redesign.md
+            - file: reference/brainstorm-implementation.md
+            - file: reference/brainstorm-re-architecture.md
+    - title: Reference
+      file: reference.md
+      children:
+        - file: glossary.md

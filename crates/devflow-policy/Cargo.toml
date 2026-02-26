@@ -1,0 +1,13 @@
+[package]
+name = "devflow-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+devflow-core = { path = "../devflow-core" }
+
+[dev-dependencies]
+toml.workspace = true
