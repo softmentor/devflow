@@ -120,6 +120,8 @@ name = "devflow-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "devflow-ext-node",
+ "devflow-ext-rust",
  "serde",
  "thiserror",
  "toml",
@@ -139,6 +141,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "devflow-core",
+ "toml",
 ]
 
 [[package]]

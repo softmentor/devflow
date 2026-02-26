@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use anyhow::{bail, Result};
 
@@ -63,15 +64,32 @@ impl ExtensionRegistry {
             selector_key.unwrap_or(primary_key)
         )
     }
+
+    pub fn validate_target_support(&self, cfg: &DevflowConfig) -> Result<()> {
+        if self.descriptors.is_empty() {
+            return Ok(());
+        }
+
+        for (profile, commands) in &cfg.targets.profiles {
+            for raw in commands {
+                let cmd = CommandRef::from_str(raw)?;
+                self.ensure_can_run(&cmd).map_err(|e| {
+                    anyhow::anyhow!(
+                        "unsupported command '{}' in targets profile '{}': {}",
+                        raw,
+                        profile,
+                        e
+                    )
+                })?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn descriptor_from_config(name: &str, entry: &ExtensionConfig) -> Result<ExtensionDescriptor> {
     let mut capabilities = entry.capabilities.iter().cloned().collect::<HashSet<_>>();
-
-    if capabilities.is_empty() {
-        // If no capabilities are declared, fall back to the extension key name.
-        capabilities.insert(name.to_string());
-    }
 
     if let ExtensionSource::Path = &entry.source {
         let path = entry.path.as_ref().ok_or_else(|| {
@@ -95,6 +113,20 @@ fn descriptor_from_config(name: &str, entry: &ExtensionConfig) -> Result<Extensi
         );
     }
 
+    if capabilities.is_empty() {
+        capabilities = match entry.source {
+            ExtensionSource::Builtin => builtin_capabilities(name).unwrap_or_default(),
+            ExtensionSource::Path => HashSet::new(),
+        };
+    }
+
+    if capabilities.is_empty() {
+        bail!(
+            "extension '{}' has no capabilities; set capabilities in config or use a known builtin",
+            name
+        );
+    }
+
     let descriptor = ExtensionDescriptor {
         name: name.to_string(),
         source: entry.source.clone(),
@@ -105,4 +137,70 @@ fn descriptor_from_config(name: &str, entry: &ExtensionConfig) -> Result<Extensi
     };
 
     Ok(descriptor)
+}
+
+fn builtin_capabilities(name: &str) -> Option<HashSet<String>> {
+    let values: &[&str] = match name {
+        "rust" => devflow_ext_rust::default_capabilities(),
+        "node" => devflow_ext_node::default_capabilities(),
+        _ => return None,
+    };
+    Some(values.iter().map(|item| (*item).to_string()).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture(toml_text: &str) -> DevflowConfig {
+        toml::from_str(toml_text).expect("fixture config should parse")
+    }
+
+    #[test]
+    fn validates_supported_target_commands() {
+        let cfg = fixture(
+            r#"
+            [project]
+            name = "demo"
+            stack = ["rust"]
+
+            [targets]
+            pr = ["fmt:check", "test:unit"]
+
+            [extensions.rust]
+            source = "builtin"
+            required = true
+            "#,
+        );
+
+        let registry = ExtensionRegistry::discover(&cfg).expect("discover should pass");
+        registry
+            .validate_target_support(&cfg)
+            .expect("supported commands should validate");
+    }
+
+    #[test]
+    fn rejects_unsupported_target_commands() {
+        let cfg = fixture(
+            r#"
+            [project]
+            name = "demo"
+            stack = ["rust"]
+
+            [targets]
+            pr = ["test:unknown_selector"]
+
+            [extensions.rust]
+            source = "builtin"
+            required = true
+            "#,
+        );
+
+        let registry = ExtensionRegistry::discover(&cfg).expect("discover should pass");
+        let err = registry
+            .validate_target_support(&cfg)
+            .expect_err("unsupported command must fail");
+        assert!(err.to_string().contains("unsupported command"));
+        assert!(err.to_string().contains("pr"));
+    }
 }

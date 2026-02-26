@@ -19,6 +19,9 @@ cargo run -p devflow-cli -- test:unit
 cargo run -p devflow-cli -- ci:render
 ```
 
+`ci:render` writes to `.github/workflows/ci.yml` by default.
+Use `--stdout` to print instead.
+
 ## Command Model
 
 Primary commands:
@@ -39,8 +42,3 @@ Selectors:
 - `test:unit`, `test:integration`, `test:smoke`
 - `check:pr`, `check:main`, `check:release`
 - `ci:render`, `ci:check`, `ci:plan`
-
-Legacy aliases:
-
-- `verify` -> `check`
-- `smoke` -> `test:smoke`

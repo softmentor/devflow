@@ -10,3 +10,5 @@ anyhow.workspace = true
 serde.workspace = true
 toml.workspace = true
 thiserror.workspace = true
+devflow-ext-rust = { path = "../devflow-ext-rust" }
+devflow-ext-node = { path = "../devflow-ext-node" }

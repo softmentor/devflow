@@ -5,12 +5,11 @@ use anyhow::{anyhow, Result};
 use devflow_core::{CommandRef, DevflowConfig};
 
 pub fn resolve_policy_commands(cfg: &DevflowConfig, selector: &str) -> Result<Vec<CommandRef>> {
-    let entries = match selector {
-        "pr" => &cfg.targets.pr,
-        "main" => &cfg.targets.main,
-        "release" => &cfg.targets.release,
-        _ => return Err(anyhow!("unknown check profile '{selector}'")),
-    };
+    let entries = cfg
+        .targets
+        .profiles
+        .get(selector)
+        .ok_or_else(|| anyhow!("unknown check profile '{selector}'"))?;
 
     entries
         .iter()
