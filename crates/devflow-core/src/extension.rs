@@ -122,6 +122,22 @@ impl ExtensionRegistry {
 
         Ok(())
     }
+
+    /// Builds the execution arguments for a command against a specific extension.
+    pub fn build_command(&self, name: &str, cmd: &CommandRef) -> Option<Vec<String>> {
+        if !self.descriptors.contains_key(name) {
+            return None;
+        }
+
+        let primary = cmd.primary.as_str();
+        let selector = cmd.selector.as_deref().unwrap_or("");
+
+        match name {
+            "rust" => devflow_ext_rust::build_command(primary, selector),
+            "node" => devflow_ext_node::build_command(primary, selector),
+            _ => None,
+        }
+    }
 }
 
 fn builtin_descriptor_for_stack(stack: &str) -> Result<ExtensionDescriptor> {

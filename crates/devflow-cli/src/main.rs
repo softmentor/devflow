@@ -78,7 +78,7 @@ fn execute(
             for cmd in resolved {
                 registry.ensure_can_run(&cmd)?;
                 println!(" - {}", cmd);
-                executor::run(cfg, &cmd)?;
+                executor::run(cfg, registry, &cmd)?;
             }
             Ok(())
         }
@@ -118,7 +118,7 @@ fn execute(
         }
         _ => {
             registry.ensure_can_run(command)?;
-            executor::run(cfg, command)
+            executor::run(cfg, registry, command)
         }
     }
 }

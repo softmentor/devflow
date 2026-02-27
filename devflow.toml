@@ -1,6 +1,6 @@
 [project]
 name = "devflow"
-stack = ["rust", "node"]
+stack = ["rust"]
 
 [runtime]
 profile = "auto"
@@ -33,22 +33,4 @@ capabilities = [
   "ci:check"
 ]
 
-[extensions.node]
-source = "builtin"
-version = "^0.1"
-api_version = 1
-required = false
-capabilities = [
-  "setup",
-  "fmt:check",
-  "fmt:fix",
-  "lint:static",
-  "build:debug",
-  "build:release",
-  "test:unit",
-  "test:integration",
-  "package:artifact",
-  "check",
-  "ci:generate",
-  "ci:check"
-]
+

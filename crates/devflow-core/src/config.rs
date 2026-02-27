@@ -24,6 +24,15 @@ pub struct DevflowConfig {
     pub targets: TargetsConfig,
     /// Optional extension configurations.
     pub extensions: Option<HashMap<String, ExtensionConfig>>,
+    /// Container configuration placeholders (for future use).
+    #[serde(default)]
+    pub container: Option<ContainerConfig>,
+    /// Cache configuration placeholders (for future use).
+    #[serde(default)]
+    pub cache: Option<CacheConfig>,
+    /// Path to the directory containing this config file, used to anchor relative paths.
+    #[serde(skip)]
+    pub source_dir: Option<PathBuf>,
 }
 
 impl DevflowConfig {
@@ -35,8 +44,15 @@ impl DevflowConfig {
     pub fn load_from_file(path: &str) -> Result<Self> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read config file: {path}"))?;
-        let cfg = toml::from_str::<Self>(&text)
+        let mut cfg = toml::from_str::<Self>(&text)
             .with_context(|| format!("failed to parse TOML config: {path}"))?;
+
+        cfg.source_dir = Some(
+            PathBuf::from(path)
+                .parent()
+                .unwrap_or(std::path::Path::new(""))
+                .to_path_buf(),
+        );
         cfg.validate()?;
         Ok(cfg)
     }
@@ -89,6 +105,21 @@ pub struct RuntimeConfig {
     /// The current runtime profile.
     #[serde(default)]
     pub profile: RuntimeProfile,
+}
+
+/// Placeholder for container configuration.
+#[derive(Debug, Deserialize, Default)]
+pub struct ContainerConfig {
+    pub image: Option<String>,
+    #[serde(default)]
+    pub fingerprint_inputs: Vec<String>,
+}
+
+/// Placeholder for cache configuration.
+#[derive(Debug, Deserialize, Default)]
+pub struct CacheConfig {
+    pub root: Option<String>,
+    pub strategy: Option<String>,
 }
 
 /// Configuration for target profiles.
