@@ -31,6 +31,7 @@ project:
               children:
                 - file: developer-guide/02-design/adr/adr-0001-command-contract.md
                 - file: developer-guide/02-design/adr/adr-0002-cache-strategy.md
+                - file: developer-guide/02-design/adr/adr-0003-dynamic-extension-wiring.md
         - title: 03 Development
           children:
             - file: developer-guide/03-development/workflow.md

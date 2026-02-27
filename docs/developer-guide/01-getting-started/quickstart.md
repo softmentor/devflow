@@ -44,5 +44,5 @@ cargo run -p devflow-cli -- ci:check
 - `devflow-cli`: executable entrypoint (`dwf`) and runtime command dispatch.
 - `devflow-policy`: profile expansion for `check:<profile>`.
 - `devflow-gh`: CI workflow generation and validation logic.
-- `devflow-ext-rust`: builtin Rust capability declarations.
-- `devflow-ext-node`: builtin Node capability declarations.
+- `devflow-ext-rust`: Rust extension implementing the `Extension` trait for canonical command mapping.
+- `devflow-ext-node`: Node extension implementing the `Extension` trait for canonical command mapping.

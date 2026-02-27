@@ -244,9 +244,12 @@ dependencies = [
  "anyhow",
  "clap",
  "devflow-core",
+ "devflow-ext-node",
+ "devflow-ext-rust",
  "devflow-gh",
  "devflow-policy",
  "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
@@ -257,9 +260,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "criterion",
- "devflow-ext-node",
- "devflow-ext-rust",
  "serde",
+ "serde_json",
  "thiserror",
  "toml",
  "tracing",
@@ -268,10 +270,16 @@ dependencies = [
 [[package]]
 name = "devflow-ext-node"
 version = "0.1.0"
+dependencies = [
+ "devflow-core",
+]
 
 [[package]]
 name = "devflow-ext-rust"
 version = "0.1.0"
+dependencies = [
+ "devflow-core",
+]
 
 [[package]]
 name = "devflow-gh"

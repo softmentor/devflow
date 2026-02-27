@@ -1,10 +1,12 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// The primary categories of commands supported by Devflow.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PrimaryCommand {
     /// Initialize a new Devflow project.
     Init,
@@ -49,7 +51,7 @@ impl PrimaryCommand {
 /// A reference to a Devflow command, including its primary type and an optional selector.
 ///
 /// Example: `test:unit` -> primary: `Test`, selector: `Some("unit")`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CommandRef {
     /// The primary command category.
     pub primary: PrimaryCommand,

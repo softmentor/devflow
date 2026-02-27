@@ -3,43 +3,34 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use devflow_core::{CommandRef, DevflowConfig, ExtensionRegistry, PrimaryCommand};
+use devflow_core::{CommandRef, DevflowConfig, ExecutionAction, ExtensionRegistry, PrimaryCommand};
 use tracing::{info, instrument, warn};
-
-#[derive(Debug, Clone, Copy)]
-enum Stack {
-    Rust,
-    Node,
-    Custom,
-}
 
 /// Runs a Devflow command by dispatching it to applicable stacks.
 #[instrument(skip(cfg, registry))]
 pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandRef) -> Result<()> {
-    let stacks = resolve_stacks(cfg);
     let mut attempted = false;
 
-    for stack in stacks {
+    for stack in &cfg.project.stack {
         if !stack_is_applicable(cfg, stack) {
-            info!(target: "devflow", "skip {}: manifest not found", stack_name(stack));
+            info!(target: "devflow", "skip {}: manifest not found", stack);
             continue;
         }
 
         let effective = with_default_selector(command);
-        let Some(argv) = map_command(stack, &effective, registry) else {
+        let Some(action) = map_command(stack, &effective, registry) else {
             info!(target: "devflow",
                 "skip {}: unsupported command {}",
-                stack_name(stack),
+                stack,
                 effective.canonical()
             );
             continue;
         };
 
         attempted = true;
-        info!(target: "devflow", "run {} on {}", effective.canonical(), stack_name(stack));
-        run_argv(&argv).with_context(|| {
-            format!("{} failed for {}", effective.canonical(), stack_name(stack))
-        })?;
+        info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
+        run_action(&action)
+            .with_context(|| format!("{} failed for {}", effective.canonical(), stack))?;
     }
 
     if !attempted {
@@ -50,22 +41,6 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
     }
 
     Ok(())
-}
-
-fn resolve_stacks(cfg: &DevflowConfig) -> Vec<Stack> {
-    cfg.project
-        .stack
-        .iter()
-        .filter_map(|value| match value.as_str() {
-            "rust" => Some(Stack::Rust),
-            "node" => Some(Stack::Node),
-            "custom" => Some(Stack::Custom),
-            _ => {
-                warn!("unknown stack '{}' ignored", value);
-                None
-            }
-        })
-        .collect()
 }
 
 fn with_default_selector(command: &CommandRef) -> CommandRef {
@@ -92,69 +67,71 @@ fn with_default_selector(command: &CommandRef) -> CommandRef {
     }
 }
 
-fn stack_is_applicable(cfg: &DevflowConfig, stack: Stack) -> bool {
+fn stack_is_applicable(cfg: &DevflowConfig, stack: &str) -> bool {
     let base = cfg.source_dir.as_deref().unwrap_or(Path::new(""));
     match stack {
-        Stack::Rust => base.join("Cargo.toml").exists(),
-        Stack::Node => base.join("package.json").exists(),
-        Stack::Custom => base.join("justfile").exists() || base.join("Makefile").exists(),
-    }
-}
-
-fn stack_name(stack: Stack) -> &'static str {
-    match stack {
-        Stack::Rust => "rust",
-        Stack::Node => "node",
-        Stack::Custom => "custom",
+        "rust" => base.join("Cargo.toml").exists(),
+        "node" => base.join("package.json").exists(),
+        "custom" => base.join("justfile").exists() || base.join("Makefile").exists(),
+        // Subprocess extensions always apply initially; execution will fail if bad mapping
+        _ => true,
     }
 }
 
 fn map_command(
-    stack: Stack,
+    stack: &str,
     cmd: &CommandRef,
     registry: &ExtensionRegistry,
-) -> Option<Vec<String>> {
+) -> Option<ExecutionAction> {
     match stack {
-        Stack::Custom => map_custom(cmd),
-        _ => registry.build_command(stack_name(stack), cmd),
+        "custom" => map_custom(cmd),
+        _ => registry.build_action(stack, cmd),
     }
 }
 
-fn map_custom(cmd: &CommandRef) -> Option<Vec<String>> {
+fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
     let target = cmd.canonical().replace(':', "-");
 
     if Path::new("justfile").exists() && command_exists("just") {
-        return Some(vec!["just".to_string(), target]);
+        return Some(ExecutionAction {
+            program: "just".to_string(),
+            args: vec![target],
+        });
     }
     if Path::new("Makefile").exists() {
-        return Some(vec!["make".to_string(), target]);
+        return Some(ExecutionAction {
+            program: "make".to_string(),
+            args: vec![target],
+        });
     }
 
     match (cmd.primary, cmd.selector.as_deref().unwrap_or("")) {
-        (PrimaryCommand::Setup, "doctor") => Some(vec![
-            "echo".to_string(),
-            "custom stack requires justfile or Makefile targets".to_string(),
-        ]),
+        (PrimaryCommand::Setup, "doctor") => Some(ExecutionAction {
+            program: "echo".to_string(),
+            args: vec!["custom stack requires justfile or Makefile targets".to_string()],
+        }),
         _ => None,
     }
 }
 
-fn run_argv(argv: &[String]) -> Result<()> {
-    let (program, args) = argv
-        .split_first()
-        .ok_or_else(|| anyhow::anyhow!("empty command argv"))?;
-
-    let status = Command::new(program)
-        .args(args)
+fn run_action(action: &ExecutionAction) -> Result<()> {
+    let status = Command::new(&action.program)
+        .args(&action.args)
         .status()
-        .with_context(|| format!("failed to start command '{} {}'", program, args.join(" ")))?;
+        .with_context(|| {
+            format!(
+                "failed to start command '{} {}'",
+                action.program,
+                action.args.join(" ")
+            )
+        })?;
 
     if !status.success() {
         bail!(
             "command failed with status {}: {} {}",
             status,
-            program,
-            args.join(" ")
+            action.program,
+            action.args.join(" ")
         );
     }
 

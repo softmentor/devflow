@@ -264,9 +264,9 @@ CI contract:
 
 Extension API requirements:
 
-- Map canonical commands to executable actions.
-- Declare capabilities (`container-required`, `supports-test-smoke`, etc.).
-- Return normalized result envelopes for policy and status emitters.
+- Implement the `Extension` trait (`name`, `capabilities`, `build_action`).
+- Map canonical commands to executable executable definitions (`ExecutionAction`).
+- Decouple from core logic via dynamic registration in the `ExtensionRegistry`.
 
 ### Extension discovery model
 

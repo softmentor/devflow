@@ -8,6 +8,7 @@ use devflow_core::{CommandRef, DevflowConfig, ExtensionRegistry, PrimaryCommand}
 use tracing::debug;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+mod discovery;
 mod executor;
 mod init;
 
@@ -57,7 +58,15 @@ fn main() -> Result<()> {
 
     let cfg = DevflowConfig::load_from_file(&cli.config)
         .with_context(|| format!("unable to load config '{}'", cli.config))?;
-    let registry = ExtensionRegistry::discover(&cfg)?;
+    let mut registry = ExtensionRegistry::discover(&cfg)?;
+
+    // Phase 1 Wiring: Explicitly compile in the required trait implementations
+    registry.register(Box::new(devflow_ext_rust::RustExtension::new()));
+    registry.register(Box::new(devflow_ext_node::NodeExtension::new()));
+
+    // Phase 2 Wiring: Runtime discovery of Subprocess Extensions
+    discovery::discover_subprocess_extensions(&cfg, &mut registry)?;
+
     registry.validate_target_support(&cfg)?;
 
     execute(&cli, &cfg, &registry, &command)

@@ -10,5 +10,5 @@ pub mod runtime;
 
 pub use command::{CommandRef, PrimaryCommand};
 pub use config::{DevflowConfig, ExtensionSource, TargetsConfig};
-pub use extension::{ExtensionDescriptor, ExtensionRegistry};
+pub use extension::{ExecutionAction, Extension, ExtensionRegistry};
 pub use runtime::RuntimeProfile;
