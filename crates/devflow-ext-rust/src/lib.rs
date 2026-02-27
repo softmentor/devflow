@@ -12,7 +12,7 @@ pub fn default_capabilities() -> &'static [&'static str] {
         "package:artifact",
         "check",
         "release",
-        "ci:render",
+        "ci:generate",
         "ci:check",
     ]
 }

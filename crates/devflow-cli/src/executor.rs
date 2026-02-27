@@ -9,6 +9,7 @@ use devflow_core::{CommandRef, DevflowConfig, PrimaryCommand};
 enum Stack {
     Rust,
     Node,
+    Custom,
 }
 
 pub fn run(cfg: &DevflowConfig, command: &CommandRef) -> Result<()> {
@@ -55,6 +56,7 @@ fn resolve_stacks(cfg: &DevflowConfig) -> Vec<Stack> {
         .filter_map(|value| match value.as_str() {
             "rust" => Some(Stack::Rust),
             "node" => Some(Stack::Node),
+            "custom" => Some(Stack::Custom),
             _ => {
                 println!("warn: unknown stack '{}' ignored", value);
                 None
@@ -78,6 +80,7 @@ fn with_default_selector(command: &CommandRef) -> CommandRef {
         PrimaryCommand::Check => "pr",
         PrimaryCommand::Release => "candidate",
         PrimaryCommand::Ci => "check",
+        PrimaryCommand::Init => "rust",
     };
 
     CommandRef {
@@ -90,6 +93,7 @@ fn stack_is_applicable(stack: Stack) -> bool {
     match stack {
         Stack::Rust => Path::new("Cargo.toml").exists(),
         Stack::Node => Path::new("package.json").exists(),
+        Stack::Custom => Path::new("justfile").exists() || Path::new("Makefile").exists(),
     }
 }
 
@@ -97,65 +101,86 @@ fn stack_name(stack: Stack) -> &'static str {
     match stack {
         Stack::Rust => "rust",
         Stack::Node => "node",
+        Stack::Custom => "custom",
     }
 }
 
-fn map_command(stack: Stack, cmd: &CommandRef) -> Option<Vec<&'static str>> {
+fn map_command(stack: Stack, cmd: &CommandRef) -> Option<Vec<String>> {
     match stack {
         Stack::Rust => map_rust(cmd),
         Stack::Node => map_node(cmd),
+        Stack::Custom => map_custom(cmd),
     }
 }
 
-fn map_rust(cmd: &CommandRef) -> Option<Vec<&'static str>> {
+fn map_rust(cmd: &CommandRef) -> Option<Vec<String>> {
     let selector = cmd.selector.as_deref().unwrap_or("");
 
     match (cmd.primary, selector) {
-        (PrimaryCommand::Setup, "toolchain") => Some(vec!["rustup", "show"]),
-        (PrimaryCommand::Setup, "deps") => Some(vec!["cargo", "fetch"]),
-        (PrimaryCommand::Setup, "doctor") => Some(vec!["cargo", "--version"]),
-        (PrimaryCommand::Fmt, "check") => Some(vec!["cargo", "fmt", "--all", "--", "--check"]),
-        (PrimaryCommand::Fmt, "fix") => Some(vec!["cargo", "fmt", "--all"]),
+        (PrimaryCommand::Setup, "toolchain") => Some(argv(&["rustup", "show"])),
+        (PrimaryCommand::Setup, "deps") => Some(argv(&["cargo", "fetch"])),
+        (PrimaryCommand::Setup, "doctor") => Some(argv(&["cargo", "--version"])),
+        (PrimaryCommand::Fmt, "check") => Some(argv(&["cargo", "fmt", "--all", "--", "--check"])),
+        (PrimaryCommand::Fmt, "fix") => Some(argv(&["cargo", "fmt", "--all"])),
         (PrimaryCommand::Lint, "static") => Some(vec![
-            "cargo",
-            "clippy",
-            "--all-targets",
-            "--all-features",
-            "--",
-            "-D",
-            "warnings",
+            "cargo".to_string(),
+            "clippy".to_string(),
+            "--all-targets".to_string(),
+            "--all-features".to_string(),
+            "--".to_string(),
+            "-D".to_string(),
+            "warnings".to_string(),
         ]),
-        (PrimaryCommand::Build, "debug") => Some(vec!["cargo", "build"]),
-        (PrimaryCommand::Build, "release") => Some(vec!["cargo", "build", "--release"]),
-        (PrimaryCommand::Test, "unit") => Some(vec!["cargo", "test", "--lib", "--bins"]),
-        (PrimaryCommand::Test, "integration") => Some(vec!["cargo", "test", "--tests"]),
-        (PrimaryCommand::Test, "smoke") => Some(vec!["cargo", "test", "smoke"]),
-        (PrimaryCommand::Package, "artifact") => Some(vec!["cargo", "build", "--release"]),
-        (PrimaryCommand::Release, "candidate") => Some(vec!["cargo", "build", "--release"]),
+        (PrimaryCommand::Build, "debug") => Some(argv(&["cargo", "build"])),
+        (PrimaryCommand::Build, "release") => Some(argv(&["cargo", "build", "--release"])),
+        (PrimaryCommand::Test, "unit") => Some(argv(&["cargo", "test", "--lib", "--bins"])),
+        (PrimaryCommand::Test, "integration") => Some(argv(&["cargo", "test", "--tests"])),
+        (PrimaryCommand::Test, "smoke") => Some(argv(&["cargo", "test", "smoke"])),
+        (PrimaryCommand::Package, "artifact") => Some(argv(&["cargo", "build", "--release"])),
+        (PrimaryCommand::Release, "candidate") => Some(argv(&["cargo", "build", "--release"])),
         _ => None,
     }
 }
 
-fn map_node(cmd: &CommandRef) -> Option<Vec<&'static str>> {
+fn map_node(cmd: &CommandRef) -> Option<Vec<String>> {
     let selector = cmd.selector.as_deref().unwrap_or("");
 
     match (cmd.primary, selector) {
-        (PrimaryCommand::Setup, "deps") => Some(vec!["npm", "ci"]),
-        (PrimaryCommand::Setup, "doctor") => Some(vec!["npm", "--version"]),
-        (PrimaryCommand::Fmt, "check") => Some(vec!["npm", "run", "fmt:check"]),
-        (PrimaryCommand::Fmt, "fix") => Some(vec!["npm", "run", "fmt:fix"]),
-        (PrimaryCommand::Lint, "static") => Some(vec!["npm", "run", "lint"]),
-        (PrimaryCommand::Build, "debug") => Some(vec!["npm", "run", "build"]),
-        (PrimaryCommand::Build, "release") => Some(vec!["npm", "run", "build"]),
-        (PrimaryCommand::Test, "unit") => Some(vec!["npm", "run", "test:unit"]),
-        (PrimaryCommand::Test, "integration") => Some(vec!["npm", "run", "test:integration"]),
-        (PrimaryCommand::Test, "smoke") => Some(vec!["npm", "run", "test:smoke"]),
-        (PrimaryCommand::Package, "artifact") => Some(vec!["npm", "pack", "--dry-run"]),
+        (PrimaryCommand::Setup, "deps") => Some(argv(&["npm", "ci"])),
+        (PrimaryCommand::Setup, "doctor") => Some(argv(&["npm", "--version"])),
+        (PrimaryCommand::Fmt, "check") => Some(argv(&["npm", "run", "fmt:check"])),
+        (PrimaryCommand::Fmt, "fix") => Some(argv(&["npm", "run", "fmt:fix"])),
+        (PrimaryCommand::Lint, "static") => Some(argv(&["npm", "run", "lint"])),
+        (PrimaryCommand::Build, "debug") => Some(argv(&["npm", "run", "build"])),
+        (PrimaryCommand::Build, "release") => Some(argv(&["npm", "run", "build"])),
+        (PrimaryCommand::Test, "unit") => Some(argv(&["npm", "run", "test:unit"])),
+        (PrimaryCommand::Test, "integration") => Some(argv(&["npm", "run", "test:integration"])),
+        (PrimaryCommand::Test, "smoke") => Some(argv(&["npm", "run", "test:smoke"])),
+        (PrimaryCommand::Package, "artifact") => Some(argv(&["npm", "pack", "--dry-run"])),
         _ => None,
     }
 }
 
-fn run_argv(argv: &[&str]) -> Result<()> {
+fn map_custom(cmd: &CommandRef) -> Option<Vec<String>> {
+    let target = cmd.canonical().replace(':', "-");
+
+    if Path::new("justfile").exists() && command_exists("just") {
+        return Some(vec!["just".to_string(), target]);
+    }
+    if Path::new("Makefile").exists() {
+        return Some(vec!["make".to_string(), target]);
+    }
+
+    match (cmd.primary, cmd.selector.as_deref().unwrap_or("")) {
+        (PrimaryCommand::Setup, "doctor") => Some(vec![
+            "echo".to_string(),
+            "custom stack requires justfile or Makefile targets".to_string(),
+        ]),
+        _ => None,
+    }
+}
+
+fn run_argv(argv: &[String]) -> Result<()> {
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| anyhow::anyhow!("empty command argv"))?;
@@ -175,4 +200,53 @@ fn run_argv(argv: &[&str]) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn argv(parts: &[&str]) -> Vec<String> {
+    parts.iter().map(|s| (*s).to_string()).collect()
+}
+
+fn command_exists(name: &str) -> bool {
+    Command::new(name).arg("--version").status().is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use devflow_core::PrimaryCommand;
+
+    fn cmd(primary: PrimaryCommand, selector: Option<&str>) -> CommandRef {
+        CommandRef {
+            primary,
+            selector: selector.map(ToOwned::to_owned),
+        }
+    }
+
+    #[test]
+    fn default_selector_is_applied() {
+        let out = with_default_selector(&cmd(PrimaryCommand::Fmt, None));
+        assert_eq!(out.canonical(), "fmt:check");
+    }
+
+    #[test]
+    fn explicit_selector_is_preserved() {
+        let out = with_default_selector(&cmd(PrimaryCommand::Test, Some("integration")));
+        assert_eq!(out.canonical(), "test:integration");
+    }
+
+    #[test]
+    fn rust_mapping_exists_for_core_commands() {
+        assert!(map_rust(&cmd(PrimaryCommand::Fmt, Some("check"))).is_some());
+        assert!(map_rust(&cmd(PrimaryCommand::Lint, Some("static"))).is_some());
+        assert!(map_rust(&cmd(PrimaryCommand::Build, Some("debug"))).is_some());
+        assert!(map_rust(&cmd(PrimaryCommand::Test, Some("unit"))).is_some());
+    }
+
+    #[test]
+    fn node_mapping_exists_for_core_commands() {
+        assert!(map_node(&cmd(PrimaryCommand::Fmt, Some("check"))).is_some());
+        assert!(map_node(&cmd(PrimaryCommand::Lint, Some("static"))).is_some());
+        assert!(map_node(&cmd(PrimaryCommand::Build, Some("debug"))).is_some());
+        assert!(map_node(&cmd(PrimaryCommand::Test, Some("unit"))).is_some());
+    }
 }

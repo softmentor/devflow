@@ -29,7 +29,7 @@ capabilities = [
   "package:artifact",
   "check",
   "release",
-  "ci:render",
+  "ci:generate",
   "ci:check"
 ]
 
@@ -49,6 +49,6 @@ capabilities = [
   "test:integration",
   "package:artifact",
   "check",
-  "ci:render",
+  "ci:generate",
   "ci:check"
 ]

@@ -1,6 +1,6 @@
 ---
 title: Rust Multi-Surface Architecture — Implementation Blueprint
-label: kroki-rs.brainstorm-implementation
+label: devflow.developer-guide.roadmap.brainstorm-implementation
 date: 2026-02-21
 ---
 

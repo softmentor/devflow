@@ -2,18 +2,61 @@ version: 1
 project:
   toc:
     - file: index.md
+    - title: User Guide
+      file: user-guide/user-index.md
+      children:
+        - file: user-guide/workflow-model.md
+        - file: user-guide/features.md
+        - file: user-guide/installation.md
+        - file: user-guide/getting-started.md
+        - file: user-guide/commands.md
+        - file: user-guide/configuration.md
+        - file: user-guide/new-stacks.md
+        - file: user-guide/ci-workflows.md
+        - file: user-guide/troubleshooting.md
     - title: Developer Guide
       file: developer-guide/index.md
       children:
-        - title: Architecture and Design
-          file: v0.1.0-architecture-and-design-review.md
-        - title: v0.1.0 Roadmap and Decisions
+        - title: 01 Getting Started
           children:
-            - file: reference/v0.1.0-platform-migration-decision.md
-            - file: reference/v0.1.0-implementation-execution-plan.md
-            - file: reference/v0.1.0-ci-container-redesign.md
-            - file: reference/brainstorm-implementation.md
-            - file: reference/brainstorm-re-architecture.md
+            - file: developer-guide/01-getting-started/quickstart.md
+            - file: developer-guide/01-getting-started/contributing.md
+        - title: 02 Design
+          children:
+            - file: developer-guide/02-design/architecture.md
+            - file: developer-guide/02-design/command-model.md
+            - file: developer-guide/02-design/extensions.md
+            - title: ADRs
+              file: developer-guide/02-design/adr/index.md
+              children:
+                - file: developer-guide/02-design/adr/adr-0001-command-contract.md
+                - file: developer-guide/02-design/adr/adr-0002-cache-strategy.md
+        - title: 03 Development
+          children:
+            - file: developer-guide/03-development/workflow.md
+            - file: developer-guide/03-development/local-dev.md
+            - file: developer-guide/03-development/coding-standards.md
+            - file: developer-guide/03-development/dogfooding.md
+        - title: 04 Infrastructure
+          children:
+            - file: developer-guide/04-infrastructure/overview.md
+            - file: developer-guide/04-infrastructure/ci.md
+        - title: 05 Operations
+          children:
+            - file: developer-guide/05-operations/troubleshooting.md
+        - title: 06 Roadmap
+          children:
+            - file: developer-guide/06-roadmap/index.md
+            - file: developer-guide/06-roadmap/swot-analysis.md
+            - file: developer-guide/06-roadmap/v0.1.0-platform-migration-decision.md
+            - file: developer-guide/06-roadmap/v0.1.0-implementation-execution-plan.md
+            - file: developer-guide/06-roadmap/v0.1.0-ci-container-redesign.md
+            - file: developer-guide/06-roadmap/v0.1.0-critical-review.md
+            - file: developer-guide/06-roadmap/brainstorm-implementation.md
+            - file: developer-guide/06-roadmap/brainstorm-re-architecture.md
+        - title: 07 Resources
+          children:
+            - file: developer-guide/07-resources/references.md
     - title: Reference
       file: reference.md
       children:

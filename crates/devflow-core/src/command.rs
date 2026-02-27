@@ -5,6 +5,7 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimaryCommand {
+    Init,
     Setup,
     Fmt,
     Lint,
@@ -19,6 +20,7 @@ pub enum PrimaryCommand {
 impl PrimaryCommand {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Init => "init",
             Self::Setup => "setup",
             Self::Fmt => "fmt",
             Self::Lint => "lint",
@@ -68,6 +70,7 @@ impl FromStr for CommandRef {
         let selector = parts.next().map(ToOwned::to_owned);
 
         let primary = match primary_text {
+            "init" => PrimaryCommand::Init,
             "setup" => PrimaryCommand::Setup,
             "fmt" => PrimaryCommand::Fmt,
             "lint" => PrimaryCommand::Lint,

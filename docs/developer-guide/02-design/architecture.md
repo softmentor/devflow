@@ -133,7 +133,7 @@ First-principles rules used:
 | `package` | Assemble distributable outputs. | Produces artifacts/images/bundles and metadata. |
 | `check` | Execute policy-defined non-mutating gate. | Composes selectors for contexts like `check:pr`, `check:main`, `check:release`. |
 | `release` | Execute release orchestration steps. | Produces release candidates, publish steps, and release metadata. |
-| `ci` | Manage CI contract generation and validation. | Handles selectors such as `ci:render`, `ci:check`, and `ci:plan`. |
+| `ci` | Manage CI contract generation and validation. | Handles selectors such as `ci:generate`, `ci:check`, and `ci:plan`. |
 
 ### Secondary command families
 
@@ -145,7 +145,7 @@ First-principles rules used:
 - `package`: `package:artifact`, `package:image`, `package:sbom`
 - `check`: `check:pr`, `check:main`, `check:release`
 - `release`: `release:candidate`, `release:publish`, `release:notes`
-- `ci`: `ci:render`, `ci:check`, `ci:plan`
+- `ci`: `ci:generate`, `ci:check`, `ci:plan`
 
 Secondary commands may be exposed as:
 

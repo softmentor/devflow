@@ -7,7 +7,7 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
         .targets
         .profiles
         .get("pr")
-        .ok_or_else(|| anyhow!("targets.pr profile is required for ci:render"))?;
+        .ok_or_else(|| anyhow!("targets.pr profile is required for ci:generate"))?;
 
     let mut jobs = String::new();
     jobs.push_str("  prep:\n");

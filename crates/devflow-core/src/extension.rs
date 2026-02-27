@@ -25,10 +25,21 @@ impl ExtensionRegistry {
     pub fn discover(config: &DevflowConfig) -> Result<Self> {
         let mut registry = Self::default();
 
-        if let Some(extensions) = &config.extensions {
-            for (name, entry) in extensions {
-                let descriptor = descriptor_from_config(name, entry)?;
-                registry.descriptors.insert(name.clone(), descriptor);
+        match &config.extensions {
+            Some(extensions) => {
+                for (name, entry) in extensions {
+                    let descriptor = descriptor_from_config(name, entry)?;
+                    registry.descriptors.insert(name.clone(), descriptor);
+                }
+            }
+            None => {
+                for stack in &config.project.stack {
+                    if stack == "custom" {
+                        continue;
+                    }
+                    let descriptor = builtin_descriptor_for_stack(stack)?;
+                    registry.descriptors.insert(stack.clone(), descriptor);
+                }
             }
         }
 
@@ -86,6 +97,24 @@ impl ExtensionRegistry {
 
         Ok(())
     }
+}
+
+fn builtin_descriptor_for_stack(stack: &str) -> Result<ExtensionDescriptor> {
+    let capabilities = builtin_capabilities(stack).ok_or_else(|| {
+        anyhow::anyhow!(
+            "no builtin extension available for stack '{}' (supported: rust,node)",
+            stack
+        )
+    })?;
+
+    Ok(ExtensionDescriptor {
+        name: stack.to_string(),
+        source: ExtensionSource::Builtin,
+        version: None,
+        api_version: 1,
+        capabilities,
+        required: true,
+    })
 }
 
 fn descriptor_from_config(name: &str, entry: &ExtensionConfig) -> Result<ExtensionDescriptor> {
@@ -202,5 +231,24 @@ mod tests {
             .expect_err("unsupported command must fail");
         assert!(err.to_string().contains("unsupported command"));
         assert!(err.to_string().contains("pr"));
+    }
+
+    #[test]
+    fn auto_loads_builtin_extensions_when_config_not_present() {
+        let cfg = fixture(
+            r#"
+            [project]
+            name = "demo"
+            stack = ["rust"]
+
+            [targets]
+            pr = ["fmt:check", "test:unit"]
+            "#,
+        );
+
+        let registry = ExtensionRegistry::discover(&cfg).expect("discover should pass");
+        registry
+            .validate_target_support(&cfg)
+            .expect("builtin extension should validate targets");
     }
 }

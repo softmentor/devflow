@@ -14,18 +14,22 @@
 ## Quick Start
 
 ```bash
+cargo run -p devflow-cli -- init rust
 cargo run -p devflow-cli -- check:pr
 cargo run -p devflow-cli -- test:unit
-cargo run -p devflow-cli -- ci:render
+cargo run -p devflow-cli -- ci:generate
 ```
 
-`ci:render` writes to `.github/workflows/ci.yml` by default.
+`ci:generate` writes to `.github/workflows/ci.yml` by default.
 Use `--stdout` to print instead.
+
+`devflow` complements existing `Makefile`/`justfile` workflows by standardizing command intent (`fmt:check`, `test:unit`, `check:pr`) and policy while still delegating stack-specific implementation details.
 
 ## Command Model
 
 Primary commands:
 
+- `init`
 - `setup`
 - `fmt`
 - `lint`
@@ -41,4 +45,4 @@ Selectors:
 - `fmt:check`, `fmt:fix`
 - `test:unit`, `test:integration`, `test:smoke`
 - `check:pr`, `check:main`, `check:release`
-- `ci:render`, `ci:check`, `ci:plan`
+- `ci:generate`, `ci:check`, `ci:plan`

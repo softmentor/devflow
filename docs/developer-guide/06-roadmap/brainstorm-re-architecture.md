@@ -1,7 +1,7 @@
 ---
 title: Rust Multi-Surface App Architecture Blueprint (v2)
 date: 2026-02-21
-label: kroki-rs.developer-guide.brainstorm-re-architecture
+label: devflow.developer-guide.roadmap.brainstorm-re-architecture
 ---
 
 # 1. Context

@@ -1,4 +1,4 @@
-.PHONY: setup fmt fmt-check lint build test package check release ci-render
+.PHONY: setup fmt fmt-check lint build test package check release ci-generate
 
 setup:
 	cargo run -p devflow-cli -- setup
@@ -27,5 +27,5 @@ check:
 release:
 	cargo run -p devflow-cli -- release:candidate
 
-ci-render:
-	cargo run -p devflow-cli -- ci:render
+ci-generate:
+	cargo run -p devflow-cli -- ci:generate

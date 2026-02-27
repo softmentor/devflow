@@ -7,11 +7,12 @@ use clap::Parser;
 use devflow_core::{CommandRef, DevflowConfig, ExtensionRegistry, PrimaryCommand};
 
 mod executor;
+mod init;
 
 #[derive(Debug, Parser)]
 #[command(name = "dwf")]
 #[command(about = "Devflow CLI")]
-struct Cli {
+pub(crate) struct Cli {
     /// Command in canonical form, for example: check:pr, fmt:fix, test:unit
     command: String,
     /// Optional selector (supports `dwf test unit` style)
@@ -22,9 +23,12 @@ struct Cli {
     /// Print generated CI workflow to stdout instead of writing to file
     #[arg(long, default_value_t = false)]
     stdout: bool,
-    /// Output path for `ci:render` when writing files
+    /// Output path for `ci:generate` when writing files
     #[arg(long, default_value = ".github/workflows/ci.yml")]
     ci_output: String,
+    /// Overwrite generated files if they already exist
+    #[arg(long, default_value_t = false)]
+    force: bool,
 }
 
 fn main() -> Result<()> {
@@ -35,13 +39,17 @@ fn main() -> Result<()> {
         None => cli.command.clone(),
     };
 
+    let command = CommandRef::from_str(&command_text)
+        .map_err(|e| anyhow!("failed to parse command '{}': {e}", command_text))?;
+
+    if command.primary == PrimaryCommand::Init {
+        return init::run(&cli, command.selector.as_deref());
+    }
+
     let cfg = DevflowConfig::load_from_file(&cli.config)
         .with_context(|| format!("unable to load config '{}'", cli.config))?;
     let registry = ExtensionRegistry::discover(&cfg)?;
     registry.validate_target_support(&cfg)?;
-
-    let command = CommandRef::from_str(&command_text)
-        .map_err(|e| anyhow!("failed to parse command '{}': {e}", command_text))?;
 
     execute(&cli, &cfg, &registry, &command)
 }
@@ -64,19 +72,26 @@ fn execute(
             }
             Ok(())
         }
-        PrimaryCommand::Ci if command.selector.as_deref() == Some("render") => {
+        PrimaryCommand::Ci if command.selector.as_deref() == Some("generate") => {
             let workflow = devflow_gh::render_workflow(cfg)?;
             if cli.stdout {
                 println!("{workflow}");
             } else {
                 write_ci_workflow(&cli.ci_output, &workflow)?;
-                println!("ci:render wrote {}", cli.ci_output);
+                println!("ci:generate wrote {}", cli.ci_output);
             }
             Ok(())
         }
         PrimaryCommand::Ci if command.selector.as_deref() == Some("check") => {
-            let workflow = devflow_gh::render_workflow(cfg)?;
-            devflow_gh::check_workflow(cfg, &workflow)?;
+            let expected = devflow_gh::render_workflow(cfg)?;
+            let actual = read_ci_workflow(&cli.ci_output)?;
+            devflow_gh::check_workflow(cfg, &actual)?;
+            if actual != expected {
+                return Err(anyhow!(
+                    "ci workflow drift detected in '{}': run 'dwf ci:generate' to resync",
+                    cli.ci_output
+                ));
+            }
             println!("ci:check passed");
             Ok(())
         }
@@ -105,4 +120,8 @@ fn write_ci_workflow(path: &str, content: &str) -> Result<()> {
             .with_context(|| format!("failed to create directory '{}'", parent.display()))?;
     }
     fs::write(output, content).with_context(|| format!("failed to write '{}'", output.display()))
+}
+
+fn read_ci_workflow(path: &str) -> Result<String> {
+    fs::read_to_string(path).with_context(|| format!("failed to read '{}'", path))
 }

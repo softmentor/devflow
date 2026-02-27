@@ -32,10 +32,10 @@ impl DevflowConfig {
     fn validate(&self) -> Result<()> {
         for stack in &self.project.stack {
             match stack.as_str() {
-                "rust" | "node" => {}
+                "rust" | "node" | "custom" => {}
                 other => {
                     return Err(anyhow!(
-                        "unsupported stack '{}' (supported: rust,node)",
+                        "unsupported stack '{}' (supported: rust,node,custom)",
                         other
                     ));
                 }

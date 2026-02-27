@@ -6,7 +6,7 @@ extends:
 project:
   id: devflow
   title: Devflow
-  description: A reusable developer workflow CLI for deterministic local and CI execution.
+  description: Deterministic local and CI workflow orchestration across stacks.
   authors:
     - name: Soft Mentor
   github: https://github.com/softmentor/devflow
@@ -16,6 +16,8 @@ site:
   nav:
     - title: Home
       url: /index
+    - title: User Guide
+      url: /user-index #slug url
     - title: Developer Guide
       url: /developer-guide/index
     - title: Reference
@@ -25,3 +27,8 @@ site:
     folders: false
     hide_authors: true
     logo_text: Devflow v0.1.0
+    logo: assets/images/devflow-icon.svg
+    logo_dark: assets/images/devflow-icon.svg
+    favicon: assets/images/devflow-icon.svg
+  parts:
+    footer: assets/parts/footer.md
