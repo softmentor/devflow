@@ -3,7 +3,10 @@ use std::{fs, path::Path};
 use anyhow::{anyhow, Context, Result};
 
 use crate::Cli;
+use tracing::{info, instrument};
 
+/// Runs the `init` command to bootstrap a new Devflow project.
+#[instrument(skip(cli))]
 pub fn run(cli: &Cli, template_selector: Option<&str>) -> Result<()> {
     let template = match template_selector {
         Some(value) => InitTemplate::from_str(value)?,
@@ -24,7 +27,7 @@ pub fn run(cli: &Cli, template_selector: Option<&str>) -> Result<()> {
             .with_context(|| format!("failed to write '{}'", cli.ci_output))?;
     }
 
-    println!(
+    info!(
         "init complete: template={}, config={}, ci={}",
         template.as_str(),
         cli.config,
@@ -35,11 +38,16 @@ pub fn run(cli: &Cli, template_selector: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// Supported project templates for initialization.
 #[derive(Debug, Clone, Copy)]
 enum InitTemplate {
+    /// Standard Rust project.
     Rust,
+    /// Node.js project.
     Node,
+    /// TypeScript project with common defaults.
     Tsc,
+    /// Kotlin project (custom stack example).
     Kotlin,
 }
 

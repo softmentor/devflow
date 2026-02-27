@@ -5,24 +5,42 @@ use anyhow::{bail, Result};
 
 use crate::command::CommandRef;
 use crate::config::{DevflowConfig, ExtensionConfig, ExtensionSource};
+use tracing::{debug, instrument};
 
+/// Describes a Devflow extension and its capabilities.
 #[derive(Debug, Clone)]
 pub struct ExtensionDescriptor {
+    /// Unique name of the extension.
     pub name: String,
+    /// Where the extension is sourced from.
     pub source: ExtensionSource,
+    /// Extension version.
     pub version: Option<String>,
+    /// The API version this extension implements.
     pub api_version: u32,
+    /// The set of command capabilities provided by this extension.
     pub capabilities: HashSet<String>,
+    /// Whether this extension is required for the project.
     pub required: bool,
 }
 
+/// A registry containing all discovered Devflow extensions.
 #[derive(Debug, Default)]
 pub struct ExtensionRegistry {
     descriptors: HashMap<String, ExtensionDescriptor>,
 }
 
 impl ExtensionRegistry {
+    /// Discovers extensions based on the provided configuration.
+    ///
+    /// If no extensions are explicitly configured, it attempts to load
+    /// builtin extensions based on the project stack.
+    #[instrument(skip(config))]
     pub fn discover(config: &DevflowConfig) -> Result<Self> {
+        debug!(
+            "discovering extensions for project: {}",
+            config.project.name
+        );
         let mut registry = Self::default();
 
         match &config.extensions {
@@ -46,7 +64,13 @@ impl ExtensionRegistry {
         Ok(registry)
     }
 
+    /// Verifies if any registered extension can handle the given command.
+    ///
+    /// # Errors
+    /// Returns an error if no registered extension exposes the required capability.
+    #[instrument(skip(self))]
     pub fn ensure_can_run(&self, cmd: &CommandRef) -> Result<()> {
+        debug!("checking capability support for: {}", cmd.canonical());
         if self.descriptors.is_empty() {
             // Command planning still works without explicit extensions for early bootstrap.
             return Ok(());
@@ -76,6 +100,7 @@ impl ExtensionRegistry {
         )
     }
 
+    /// Validates that all commands defined in the project targets are supported by at least one extension.
     pub fn validate_target_support(&self, cfg: &DevflowConfig) -> Result<()> {
         if self.descriptors.is_empty() {
             return Ok(());
@@ -187,6 +212,8 @@ mod tests {
 
     #[test]
     fn validates_supported_target_commands() {
+        // Verifies that the registry correctly identifies and validates
+        // commands that are supported by registered extensions.
         let cfg = fixture(
             r#"
             [project]
@@ -210,6 +237,8 @@ mod tests {
 
     #[test]
     fn rejects_unsupported_target_commands() {
+        // Ensures that the registry fails validation if a target command
+        // is not supported by any registered extension.
         let cfg = fixture(
             r#"
             [project]
@@ -235,6 +264,8 @@ mod tests {
 
     #[test]
     fn auto_loads_builtin_extensions_when_config_not_present() {
+        // Verifies that Devflow automatically discovers builtin extensions
+        // based on the project stack if no explicit extensions are defined.
         let cfg = fixture(
             r#"
             [project]

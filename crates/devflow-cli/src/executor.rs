@@ -4,6 +4,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 
 use devflow_core::{CommandRef, DevflowConfig, PrimaryCommand};
+use tracing::{info, instrument, warn};
 
 #[derive(Debug, Clone, Copy)]
 enum Stack {
@@ -12,19 +13,21 @@ enum Stack {
     Custom,
 }
 
+/// Runs a Devflow command by dispatching it to applicable stacks.
+#[instrument(skip(cfg))]
 pub fn run(cfg: &DevflowConfig, command: &CommandRef) -> Result<()> {
     let stacks = resolve_stacks(cfg);
     let mut attempted = false;
 
     for stack in stacks {
         if !stack_is_applicable(stack) {
-            println!("skip {}: manifest not found", stack_name(stack));
+            info!(target: "devflow", "skip {}: manifest not found", stack_name(stack));
             continue;
         }
 
         let effective = with_default_selector(command);
         let Some(argv) = map_command(stack, &effective) else {
-            println!(
+            info!(target: "devflow",
                 "skip {}: unsupported command {}",
                 stack_name(stack),
                 effective.canonical()
@@ -33,7 +36,7 @@ pub fn run(cfg: &DevflowConfig, command: &CommandRef) -> Result<()> {
         };
 
         attempted = true;
-        println!("run {} on {}", effective.canonical(), stack_name(stack));
+        info!(target: "devflow", "run {} on {}", effective.canonical(), stack_name(stack));
         run_argv(&argv).with_context(|| {
             format!("{} failed for {}", effective.canonical(), stack_name(stack))
         })?;
@@ -58,7 +61,7 @@ fn resolve_stacks(cfg: &DevflowConfig) -> Vec<Stack> {
             "node" => Some(Stack::Node),
             "custom" => Some(Stack::Custom),
             _ => {
-                println!("warn: unknown stack '{}' ignored", value);
+                warn!("unknown stack '{}' ignored", value);
                 None
             }
         })
@@ -224,18 +227,21 @@ mod tests {
 
     #[test]
     fn default_selector_is_applied() {
+        // Verifies that a primary command without a selector gets a sensible default.
         let out = with_default_selector(&cmd(PrimaryCommand::Fmt, None));
         assert_eq!(out.canonical(), "fmt:check");
     }
 
     #[test]
     fn explicit_selector_is_preserved() {
+        // Verifies that if a selector is already present, it is not overwritten by defaults.
         let out = with_default_selector(&cmd(PrimaryCommand::Test, Some("integration")));
         assert_eq!(out.canonical(), "test:integration");
     }
 
     #[test]
     fn rust_mapping_exists_for_core_commands() {
+        // Ensures that core Devflow commands have corresponding Cargo commands mapped for Rust.
         assert!(map_rust(&cmd(PrimaryCommand::Fmt, Some("check"))).is_some());
         assert!(map_rust(&cmd(PrimaryCommand::Lint, Some("static"))).is_some());
         assert!(map_rust(&cmd(PrimaryCommand::Build, Some("debug"))).is_some());
@@ -244,6 +250,7 @@ mod tests {
 
     #[test]
     fn node_mapping_exists_for_core_commands() {
+        // Ensures that core Devflow commands have corresponding npm scripts mapped for Node.
         assert!(map_node(&cmd(PrimaryCommand::Fmt, Some("check"))).is_some());
         assert!(map_node(&cmd(PrimaryCommand::Lint, Some("static"))).is_some());
         assert!(map_node(&cmd(PrimaryCommand::Build, Some("debug"))).is_some());

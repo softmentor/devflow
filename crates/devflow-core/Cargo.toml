@@ -12,3 +12,11 @@ toml.workspace = true
 thiserror.workspace = true
 devflow-ext-rust = { path = "../devflow-ext-rust" }
 devflow-ext-node = { path = "../devflow-ext-node" }
+tracing = "0.1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "config_bench"
+harness = false

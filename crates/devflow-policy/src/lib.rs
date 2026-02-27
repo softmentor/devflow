@@ -3,8 +3,11 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 
 use devflow_core::{CommandRef, DevflowConfig};
+use tracing::{debug, instrument};
 
+#[instrument(skip(cfg))]
 pub fn resolve_policy_commands(cfg: &DevflowConfig, selector: &str) -> Result<Vec<CommandRef>> {
+    debug!("resolving commands for selector: {}", selector);
     let entries = cfg
         .targets
         .profiles
@@ -39,6 +42,8 @@ mod tests {
 
     #[test]
     fn resolves_pr_profile() {
+        // Verifies that the check profile "pr" is correctly resolved
+        // to its constituent command references.
         let cfg = fixture();
         let out = resolve_policy_commands(&cfg, "pr").expect("pr profile should resolve");
         let values = out.iter().map(|c| c.canonical()).collect::<Vec<_>>();

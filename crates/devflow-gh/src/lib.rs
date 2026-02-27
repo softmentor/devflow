@@ -1,8 +1,11 @@
 use anyhow::{anyhow, Result};
+use tracing::{debug, instrument};
 
 use devflow_core::DevflowConfig;
 
+#[instrument(skip(cfg))]
 pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
+    debug!("rendering workflow for project: {}", cfg.project.name);
     let pr = cfg
         .targets
         .profiles
@@ -13,8 +16,7 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
     jobs.push_str("  prep:\n");
     jobs.push_str("    runs-on: ubuntu-latest\n");
     jobs.push_str("    steps:\n");
-    jobs.push_str("      - uses: actions/checkout@v4\n");
-    jobs.push_str("\n");
+    jobs.push('\n');
 
     jobs.push_str("  build:\n");
     jobs.push_str("    runs-on: ubuntu-latest\n");
@@ -22,7 +24,7 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
     jobs.push_str("    steps:\n");
     jobs.push_str("      - uses: actions/checkout@v4\n");
     jobs.push_str("      - run: dwf build:debug\n");
-    jobs.push_str("\n");
+    jobs.push('\n');
 
     for cmd in pr {
         let id = format!("check_{}", sanitize_job_name(cmd));
@@ -32,7 +34,7 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
         jobs.push_str("    steps:\n");
         jobs.push_str("      - uses: actions/checkout@v4\n");
         jobs.push_str(&format!("      - run: dwf {}\n", cmd));
-        jobs.push_str("\n");
+        jobs.push('\n');
     }
 
     Ok(format!(
@@ -113,6 +115,8 @@ mod tests {
 
     #[test]
     fn renders_prep_build_and_profile_jobs() {
+        // Verifies that the rendered GitHub workflow contains the necessary
+        // boilerplate jobs (prep, build) and specific check jobs from targets.pr.
         let cfg = fixture();
         let out = render_workflow(&cfg).expect("render should pass");
         assert!(out.contains("  prep:"));
@@ -124,6 +128,7 @@ mod tests {
 
     #[test]
     fn check_passes_for_rendered_output() {
+        // Ensures that a workflow rendered by Devflow passes its own internal validation.
         let cfg = fixture();
         let out = render_workflow(&cfg).expect("render should pass");
         check_workflow(&cfg, &out).expect("rendered output should validate");
@@ -131,6 +136,7 @@ mod tests {
 
     #[test]
     fn check_fails_when_required_job_missing() {
+        // Ensures that the workflow validator correctly identifies missing required jobs.
         let cfg = fixture();
         let broken = "name: ci\n\njobs:\n  prep:\n";
         let err = check_workflow(&cfg, broken).expect_err("must fail");

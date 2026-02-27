@@ -19,7 +19,7 @@ site:
     - title: User Guide
       url: /user-index #slug url
     - title: Developer Guide
-      url: /developer-guide/index
+      url: /developer-index
     - title: Reference
       url: /reference
   options:

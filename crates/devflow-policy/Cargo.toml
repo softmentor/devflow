@@ -8,6 +8,7 @@ authors.workspace = true
 [dependencies]
 anyhow.workspace = true
 devflow-core = { path = "../devflow-core" }
+tracing = "0.1"
 
 [dev-dependencies]
 toml.workspace = true

@@ -5,34 +5,43 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 
 use devflow_core::{CommandRef, DevflowConfig, ExtensionRegistry, PrimaryCommand};
+use tracing::debug;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 mod executor;
 mod init;
 
+/// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
 #[command(name = "dwf")]
-#[command(about = "Devflow CLI")]
+#[command(about = "Devflow CLI - Modern developer workflow automation")]
 pub(crate) struct Cli {
-    /// Command in canonical form, for example: check:pr, fmt:fix, test:unit
+    /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: String,
     /// Optional selector (supports `dwf test unit` style)
     selector: Option<String>,
-    /// Path to devflow config
+    /// Path to devflow config file.
     #[arg(long, default_value = "devflow.toml")]
     config: String,
-    /// Print generated CI workflow to stdout instead of writing to file
+    /// Print generated CI workflow to stdout instead of writing to file.
     #[arg(long, default_value_t = false)]
     stdout: bool,
-    /// Output path for `ci:generate` when writing files
+    /// Output path for `ci:generate` when writing files.
     #[arg(long, default_value = ".github/workflows/ci.yml")]
     ci_output: String,
-    /// Overwrite generated files if they already exist
+    /// Overwrite generated files if they already exist.
     #[arg(long, default_value_t = false)]
     force: bool,
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
+        .init();
+
     let cli = Cli::parse();
+    debug!("parsed cli arguments: {:?}", cli);
 
     let command_text = match &cli.selector {
         Some(selector) => format!("{}:{}", cli.command, selector),
@@ -54,6 +63,7 @@ fn main() -> Result<()> {
     execute(&cli, &cfg, &registry, &command)
 }
 
+/// Executes a validated Devflow command.
 fn execute(
     cli: &Cli,
     cfg: &DevflowConfig,

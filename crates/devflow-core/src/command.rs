@@ -3,21 +3,33 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
+/// The primary categories of commands supported by Devflow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimaryCommand {
+    /// Initialize a new Devflow project.
     Init,
+    /// Setup the environment for the project.
     Setup,
+    /// Format source code.
     Fmt,
+    /// Run static analysis and linting.
     Lint,
+    /// Build the project.
     Build,
+    /// Run tests.
     Test,
+    /// Package the project for distribution.
     Package,
+    /// Run all necessary checks (e.g., for a PR).
     Check,
+    /// Perform a release.
     Release,
+    /// CI-related operations (e.g., configuration generation).
     Ci,
 }
 
 impl PrimaryCommand {
+    /// Returns the string representation of the primary command.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Init => "init",
@@ -34,13 +46,19 @@ impl PrimaryCommand {
     }
 }
 
+/// A reference to a Devflow command, including its primary type and an optional selector.
+///
+/// Example: `test:unit` -> primary: `Test`, selector: `Some("unit")`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandRef {
+    /// The primary command category.
     pub primary: PrimaryCommand,
+    /// An optional sub-command or target selector.
     pub selector: Option<String>,
 }
 
 impl CommandRef {
+    /// Returns the canonical string representation of the command (e.g., `primary:selector`).
     pub fn canonical(&self) -> String {
         match &self.selector {
             Some(selector) => format!("{}:{}", self.primary.as_str(), selector),
@@ -93,6 +111,8 @@ mod tests {
 
     #[test]
     fn parses_primary_only_command() {
+        // Verifies that a simple command string like "check" is correctly parsed
+        // as a PrimaryCommand with no selector.
         let cmd = CommandRef::from_str("check").expect("check should parse");
         assert_eq!(cmd.primary, PrimaryCommand::Check);
         assert_eq!(cmd.selector, None);
@@ -100,6 +120,8 @@ mod tests {
 
     #[test]
     fn parses_selector_command() {
+        // Verifies that a colon-separated command like "test:unit" is correctly split
+        // into a PrimaryCommand and a selector.
         let cmd = CommandRef::from_str("test:unit").expect("test:unit should parse");
         assert_eq!(cmd.primary, PrimaryCommand::Test);
         assert_eq!(cmd.selector.as_deref(), Some("unit"));
@@ -107,6 +129,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_primary() {
+        // Ensures that an invalid primary command results in a parsing error.
         let err = CommandRef::from_str("unknown:foo").expect_err("must fail");
         assert!(matches!(err, CommandParseError::UnknownPrimary(_)));
     }

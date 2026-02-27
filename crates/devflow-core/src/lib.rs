@@ -1,3 +1,8 @@
+//! Core logic and abstractions for the Devflow system.
+//!
+//! This crate defines the project configuration, command structures,
+//! extension registry, and runtime profiles used across the Devflow workspace.
+
 pub mod command;
 pub mod config;
 pub mod extension;

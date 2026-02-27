@@ -15,7 +15,7 @@ project:
         - file: user-guide/ci-workflows.md
         - file: user-guide/troubleshooting.md
     - title: Developer Guide
-      file: developer-guide/index.md
+      file: developer-guide/developer-index.md
       children:
         - title: 01 Getting Started
           children:

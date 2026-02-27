@@ -10,8 +10,11 @@ name = "dwf"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace = true
-clap.workspace = true
+anyhow = { workspace = true }
+clap = { workspace = true }
 devflow-core = { path = "../devflow-core" }
 devflow-policy = { path = "../devflow-policy" }
 devflow-gh = { path = "../devflow-gh" }
+serde = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
