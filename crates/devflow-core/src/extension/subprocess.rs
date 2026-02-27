@@ -94,3 +94,78 @@ impl Extension for SubprocessExtension {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::PrimaryCommand;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use tempfile::TempDir;
+
+    fn create_mock_extension(dir: &TempDir) -> String {
+        let script_path = dir.path().join("mock-ext.py");
+        let script_content = r#"#!/usr/bin/env python3
+import sys
+import json
+
+if "--build-action" in sys.argv:
+    input_data = sys.stdin.read()
+    cmd = json.loads(input_data)
+    if cmd.get("primary") == "test":
+        print(json.dumps({"program": "echo", "args": ["mock-test"]}))
+        sys.exit(0)
+    else:
+        sys.exit(1)
+"#;
+        fs::write(&script_path, script_content).unwrap();
+
+        let mut perms = fs::metadata(&script_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script_path, perms).unwrap();
+
+        script_path.to_string_lossy().to_string()
+    }
+
+    #[test]
+    fn subprocess_extension_build_action_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary_path = create_mock_extension(&dir);
+
+        let ext = SubprocessExtension::new(
+            "mock".to_string(),
+            binary_path,
+            HashSet::from(["test".to_string()]),
+        );
+
+        let cmd = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: None,
+        };
+
+        let action = ext.build_action(&cmd).expect("should return action");
+        assert_eq!(action.program, "echo");
+        assert_eq!(action.args, vec!["mock-test".to_string()]);
+    }
+
+    #[test]
+    fn subprocess_extension_build_action_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary_path = create_mock_extension(&dir);
+
+        let ext = SubprocessExtension::new(
+            "mock".to_string(),
+            binary_path,
+            HashSet::from(["test".to_string()]),
+        );
+
+        // Our python script exits with 1 for non-test commands
+        let cmd = CommandRef {
+            primary: PrimaryCommand::Build,
+            selector: None,
+        };
+
+        let action = ext.build_action(&cmd);
+        assert!(action.is_none());
+    }
+}

@@ -12,6 +12,7 @@ project:
         - file: user-guide/commands.md
         - file: user-guide/configuration.md
         - file: user-guide/new-stacks.md
+        - file: user-guide/custom-extensions.md
         - file: user-guide/ci-workflows.md
         - file: user-guide/troubleshooting.md
     - title: Developer Guide
@@ -38,6 +39,7 @@ project:
             - file: developer-guide/03-development/local-dev.md
             - file: developer-guide/03-development/coding-standards.md
             - file: developer-guide/03-development/dogfooding.md
+            - file: developer-guide/03-development/writing-extensions.md
         - title: 04 Infrastructure
           children:
             - file: developer-guide/04-infrastructure/overview.md

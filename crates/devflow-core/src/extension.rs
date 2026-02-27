@@ -125,3 +125,105 @@ impl ExtensionRegistry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::PrimaryCommand;
+
+    #[derive(Debug)]
+    struct MockExtension {
+        name: String,
+        capabilities: HashSet<String>,
+        action: Option<ExecutionAction>,
+    }
+
+    impl Extension for MockExtension {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn capabilities(&self) -> HashSet<String> {
+            self.capabilities.clone()
+        }
+
+        fn build_action(&self, _cmd: &CommandRef) -> Option<ExecutionAction> {
+            self.action.clone()
+        }
+    }
+
+    #[test]
+    fn register_and_retrieve_action() {
+        let mut registry = ExtensionRegistry::default();
+        let ext = MockExtension {
+            name: "mock".to_string(),
+            capabilities: HashSet::from(["test".to_string()]),
+            action: Some(ExecutionAction {
+                program: "echo".to_string(),
+                args: vec!["hello".to_string()],
+            }),
+        };
+
+        registry.register(Box::new(ext));
+
+        let cmd = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: None,
+        };
+
+        let action = registry.build_action("mock", &cmd).unwrap();
+        assert_eq!(action.program, "echo");
+        assert_eq!(action.args, vec!["hello"]);
+
+        let missing = registry.build_action("nonexistent", &cmd);
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn ensure_can_run_primary_match() {
+        let mut registry = ExtensionRegistry::default();
+        let ext = MockExtension {
+            name: "mock".to_string(),
+            capabilities: HashSet::from(["test".to_string()]),
+            action: None,
+        };
+        registry.register(Box::new(ext));
+
+        let cmd_supported = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: None,
+        };
+        assert!(registry.ensure_can_run(&cmd_supported).is_ok());
+
+        let cmd_unsupported = CommandRef {
+            primary: PrimaryCommand::Build,
+            selector: None,
+        };
+        assert!(registry.ensure_can_run(&cmd_unsupported).is_err());
+    }
+
+    #[test]
+    fn ensure_can_run_selector_match() {
+        let mut registry = ExtensionRegistry::default();
+        let ext = MockExtension {
+            name: "mock".to_string(),
+            capabilities: HashSet::from(["test:lint".to_string(), "fmt".to_string()]),
+            action: None,
+        };
+        registry.register(Box::new(ext));
+
+        // Exact match on selector
+        let cmd_supported = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: Some("lint".to_string()),
+        };
+        assert!(registry.ensure_can_run(&cmd_supported).is_ok());
+
+        // We only support test:lint, pure "test" or "test:unit" is not explicitly supported here
+        let cmd_unsupported_selector = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: Some("unit".to_string()),
+        };
+        assert!(registry.ensure_can_run(&cmd_unsupported_selector).is_err());
+    }
+}
