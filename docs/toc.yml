@@ -27,6 +27,7 @@ project:
             - file: developer-guide/02-design/architecture.md
             - file: developer-guide/02-design/command-model.md
             - file: developer-guide/02-design/extensions.md
+            - file: developer-guide/02-design/container-execution.md
             - title: ADRs
               file: developer-guide/02-design/adr/index.md
               children:

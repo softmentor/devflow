@@ -224,6 +224,8 @@ Determinism & Orchestration constraints:
 
 ## 8. Container and Cache Design
 
+> **Deep Dive**: For a dedicated exploration of container debugging, engine determinism, and exact stack-agnostic volume mappings, refer to the [Container and Cache Execution Design](container-execution.md) document.
+
 Canonical cache root:
 
 - `DWF_CACHE_ROOT` (default `.cache/devflow`)
