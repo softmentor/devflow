@@ -3,7 +3,7 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use devflow_core::{CommandRef, DevflowConfig, ExecutionAction, ExtensionRegistry, PrimaryCommand};
+use devflow_core::{CommandRef, DevflowConfig, ExecutionAction, ExtensionRegistry, PrimaryCommand, config::ContainerEngine, runtime::RuntimeProfile};
 use tracing::{info, instrument, warn};
 
 /// Runs a Devflow command by dispatching it to applicable stacks.
@@ -28,8 +28,15 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
         };
 
         attempted = true;
+        
+        let final_action = if cfg.runtime.profile == RuntimeProfile::Container {
+            build_container_proxy(cfg, registry, &action)?
+        } else {
+            action
+        };
+
         info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
-        run_action(&action)
+        run_action(&final_action)
             .with_context(|| format!("{} failed for {}", effective.canonical(), stack))?;
     }
 
@@ -117,6 +124,89 @@ fn run_action(action: &ExecutionAction) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn build_container_proxy(
+    cfg: &DevflowConfig,
+    registry: &ExtensionRegistry,
+    action: &ExecutionAction,
+) -> Result<ExecutionAction> {
+    let container_config = cfg.container.as_ref();
+    let engine_cfg = container_config.map(|c| c.engine).unwrap_or_default();
+
+    let engine_cmd = match engine_cfg {
+        ContainerEngine::Docker => "docker",
+        ContainerEngine::Podman => "podman",
+        ContainerEngine::Auto => {
+            if command_exists("docker") {
+                "docker"
+            } else if command_exists("podman") {
+                "podman"
+            } else {
+                bail!("no container engine (docker or podman) found on PATH");
+            }
+        }
+    };
+
+    if !command_exists(engine_cmd) {
+        bail!("required container engine '{engine_cmd}' is not installed or not on PATH");
+    }
+
+    let default_image = "ghcr.io/softmentor/devflow-ci:latest".to_string();
+    let image = container_config
+        .and_then(|c| c.image.clone())
+        .unwrap_or(default_image);
+
+    let cache_config = cfg.cache.as_ref();
+    let dwf_cache_root = cache_config
+        .and_then(|c| c.root.clone())
+        .unwrap_or_else(|| ".cache/devflow".to_string());
+
+    let cwd = std::env::current_dir()?;
+    let cwd_str = cwd.to_string_lossy();
+
+    let mut args = vec![
+        "run".to_string(),
+        "--rm".to_string(),
+        "-v".to_string(),
+        format!("{}:/workspace", cwd_str),
+        "-w".to_string(),
+        "/workspace".to_string(),
+    ];
+
+    let mounts = registry.all_cache_mounts();
+    // Resolve absolute path safely. If it doesn't exist, use the fallback.
+    let abs_cache_root = std::fs::canonicalize(&dwf_cache_root)
+        .unwrap_or_else(|_| Path::new(&cwd).join(&dwf_cache_root));
+
+    for mount in mounts {
+        let parts: Vec<&str> = mount.split(':').collect();
+        if parts.len() == 2 {
+            let host_rel = parts[0];
+            let container_abs = parts[1];
+            let host_abs = abs_cache_root.join(host_rel);
+            
+            if let Err(e) = std::fs::create_dir_all(&host_abs) {
+                warn!("failed to create cache directory {}: {}", host_abs.display(), e);
+            }
+            
+            args.push("-v".to_string());
+            args.push(format!("{}:{}", host_abs.display(), container_abs));
+        } else {
+            warn!("invalid cache mount format from extension: {}", mount);
+        }
+    }
+
+    // Proxy the target environment variables if they need propagation, 
+    // but Devflow limits standard env vars by default.
+    args.push(image);
+    args.push(action.program.clone());
+    args.extend(action.args.clone());
+
+    Ok(ExecutionAction {
+        program: engine_cmd.to_string(),
+        args,
+    })
 }
 
 fn command_exists(name: &str) -> bool {

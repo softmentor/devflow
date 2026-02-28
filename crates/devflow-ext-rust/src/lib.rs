@@ -71,13 +71,29 @@ impl Extension for RustExtension {
             )),
             ("build", "debug") => Some(action("cargo", &["build"])),
             ("build", "release") => Some(action("cargo", &["build", "--release"])),
-            ("test", "unit") => Some(action("cargo", &["test", "--lib", "--bins"])),
+            ("test", "unit") => Some(action("cargo", &["nextest", "run", "--lib", "--bins"])),
             ("test", "integration") => Some(action("cargo", &["test", "--tests"])),
             ("test", "smoke") => Some(action("cargo", &["test", "smoke"])),
             ("package", "artifact") => Some(action("cargo", &["build", "--release"])),
             ("release", "candidate") => Some(action("cargo", &["build", "--release"])),
             _ => None,
         }
+    }
+
+    fn cache_mounts(&self) -> Vec<String> {
+        vec![
+            "rust/cargo/registry:/usr/local/cargo/registry".to_string(),
+            "rust/cargo/git:/usr/local/cargo/git".to_string(),
+            "rust/sccache:/root/.cache/sccache".to_string(),
+        ]
+    }
+
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        vec![
+            "Cargo.lock".to_string(),
+            "rust-toolchain.toml".to_string(),
+            "Cargo.toml".to_string(),
+        ]
     }
 }
 

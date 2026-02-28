@@ -9,6 +9,7 @@ pub mod constants;
 pub mod extension;
 pub mod project;
 pub mod runtime;
+pub mod fingerprint;
 
 pub use command::{CommandRef, PrimaryCommand};
 pub use config::{DevflowConfig, ExtensionSource, TargetsConfig};

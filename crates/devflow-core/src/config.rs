@@ -107,16 +107,30 @@ pub struct RuntimeConfig {
     pub profile: RuntimeProfile,
 }
 
-/// Placeholder for container configuration.
-#[derive(Debug, Deserialize, Default)]
+/// Supported container proxy engines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ContainerEngine {
+    Docker,
+    Podman,
+    #[default]
+    Auto,
+}
+
+/// Configuration for container environments.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ContainerConfig {
     pub image: Option<String>,
+    #[serde(default)]
+    pub engine: ContainerEngine,
     #[serde(default)]
     pub fingerprint_inputs: Vec<String>,
 }
 
-/// Placeholder for cache configuration.
-#[derive(Debug, Deserialize, Default)]
+/// Configuration for build artifact caching.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CacheConfig {
     pub root: Option<String>,
     pub strategy: Option<String>,
@@ -258,6 +272,30 @@ mod tests {
         assert_eq!(cfg.project.name, "success-load");
         assert_eq!(cfg.project.stack, vec!["node"]);
         assert_eq!(cfg.source_dir, Some(dir.path().to_path_buf()));
+    }
+
+    #[test]
+    fn integration_test_load_with_container_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("devflow.toml");
+
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "ghcr.io/demo:latest"
+        engine = "podman"
+        "#;
+
+        std::fs::write(&config_path, text).unwrap();
+
+        let cfg = DevflowConfig::load_from_file(config_path.to_str().unwrap()).unwrap();
+        assert!(cfg.container.is_some());
+        let container = cfg.container.unwrap();
+        assert_eq!(container.image.as_deref(), Some("ghcr.io/demo:latest"));
+        assert_eq!(container.engine, ContainerEngine::Podman);
     }
 
     #[test]

@@ -26,6 +26,19 @@ pub trait Extension: std::fmt::Debug {
     fn capabilities(&self) -> HashSet<String>;
     /// Maps a command reference to an executable action.
     fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction>;
+
+    /// Returns the host-to-container volume mappings required by this extension.
+    /// Expected format: `host_relative_dir:container_absolute_dir`
+    /// Example: `rust/cargo:/usr/local/cargo`
+    fn cache_mounts(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Returns a list of files or globs that constitute the execution fingerprint identity.
+    /// Example: `["rust-toolchain.toml", "Cargo.lock"]`
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// A registry containing all discovered Devflow extensions.
@@ -123,6 +136,20 @@ impl ExtensionRegistry {
         } else {
             None
         }
+    }
+
+    /// Aggregates all cache mounts requested by the active extensions.
+    /// Used by the container executor to map generic host directories.
+    pub fn all_cache_mounts(&self) -> Vec<String> {
+        let mut mounts = HashSet::new();
+        for ext in self.extensions.values() {
+            for mount in ext.cache_mounts() {
+                mounts.insert(mount);
+            }
+        }
+        let mut sorted: Vec<String> = mounts.into_iter().collect();
+        sorted.sort();
+        sorted
     }
 }
 
