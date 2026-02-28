@@ -110,6 +110,64 @@ ensure_path_persisted() {
   fi
 }
 
+log "determining system architecture"
+OS="$(uname -s)"
+case "$OS" in
+    Linux)  OS_NAME="unknown-linux-gnu" ;;
+    Darwin) OS_NAME="apple-darwin" ;;
+    *)      OS_NAME="" ;;
+esac
+
+ARCH="$(uname -m)"
+case "$ARCH" in
+    x86_64)   ARCH_NAME="x86_64" ;;
+    amd64)    ARCH_NAME="x86_64" ;;
+    arm64)    ARCH_NAME="aarch64" ;;
+    aarch64)  ARCH_NAME="aarch64" ;;
+    *)        ARCH_NAME="" ;;
+esac
+
+if [ -n "$OS_NAME" ] && [ -n "$ARCH_NAME" ] && command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+    TARGET="${ARCH_NAME}-${OS_NAME}"
+    REPO="softmentor/devflow"
+    
+    log "fetching latest release version"
+    if ! VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'); then
+        log "failed to fetch latest version, falling back to local compilation"
+        VERSION=""
+    fi
+
+    if [ -n "$VERSION" ]; then
+        DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/dwf-${TARGET}.tar.gz"
+        TMP_DIR=$(mktemp -d)
+        TAR_FILE="$TMP_DIR/dwf.tar.gz"
+        
+        log "downloading pre-compiled binary for $TARGET from $DOWNLOAD_URL"
+        if curl -sL -f -o "$TAR_FILE" "$DOWNLOAD_URL"; then
+            log "extracting"
+            tar -xzf "$TAR_FILE" -C "$TMP_DIR"
+            
+            log "installing to ${TARGET_BIN}"
+            mkdir -p "${INSTALL_DIR}"
+            cp "$TMP_DIR/dwf" "${TARGET_BIN}"
+            chmod +x "${TARGET_BIN}"
+            rm -rf "$TMP_DIR"
+            
+            log "verifying installation"
+            "${TARGET_BIN}" --version >/dev/null
+            ensure_path_persisted
+            
+            log "done"
+            log "binary: ${TARGET_BIN}"
+            exit 0
+        else
+            log "download failed (maybe release pattern doesn't exist yet?), falling back to local compilation"
+            rm -rf "$TMP_DIR"
+        fi
+    fi
+fi
+
+log "could not install pre-compiled binary, falling back to local compilation"
 log "checking prerequisites"
 require_cmd cargo
 require_cmd rustc
