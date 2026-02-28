@@ -1,0 +1,36 @@
+[project]
+name = "devflow"
+stack = ["rust"]
+
+[runtime]
+profile = "auto"
+
+[targets]
+pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
+main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration", "test:smoke"]
+release = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration", "test:smoke", "package:artifact"]
+
+[extensions.rust]
+source = "builtin"
+version = "^0.1"
+api_version = 1
+required = true
+capabilities = [
+  "setup",
+  "fmt:check",
+  "fmt:fix",
+  "lint:static",
+  "lint:security",
+  "build:debug",
+  "build:release",
+  "test:unit",
+  "test:integration",
+  "test:smoke",
+  "package:artifact",
+  "check",
+  "release",
+  "ci:generate",
+  "ci:check"
+]
+
+

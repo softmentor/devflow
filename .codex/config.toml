@@ -1,0 +1,128 @@
+# =============================================================================
+# Codex CLI — Project-Level Configuration
+# File: <project-root>/.codex/config.toml
+#
+# This file is loaded ONLY when the project is marked as trusted.
+# Trust a project with:  codex --trust
+#
+# Precedence: CLI flags → profile → THIS FILE → user config → defaults
+#
+# Stack: Rust + Node/TypeScript + Python, version-controlled with Git
+# =============================================================================
+
+
+################################################################################
+# Profile Selection
+################################################################################
+
+# Activate the "balanced" profile from ~/.codex/config.toml.
+# Gives workspace-write sandbox + on-request approval — good daily default.
+# Override per-session with:  codex --profile speed
+#                             codex --profile locked
+profile = "balanced"
+
+
+################################################################################
+# Project-Specific Model Tuning
+################################################################################
+
+# Bump reasoning for this polyglot project — cross-language tasks benefit
+# from deeper thinking.
+model_reasoning_effort = "high"
+
+# Optional: custom system instructions scoped to this project.
+# instructions = "This is a polyglot project. Prefer idiomatic patterns per language."
+
+# Optional: point to a project-local AGENTS.md or instructions file.
+# model_instructions_file = "./AGENTS.md"
+
+
+################################################################################
+# Shell Environment Policy — Strict Whitelist
+################################################################################
+# Only these variables are visible to Codex subprocesses.
+# Everything else (secrets, cloud creds, tokens) is invisible by design.
+
+[shell_environment_policy]
+inherit = "all"
+ignore_default_excludes = false
+
+# Whitelist mode: ONLY these vars pass through. Everything else is dropped.
+include_only = [
+    # ── Core POSIX / shell ────────────────────────────────────────────
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "LC_*",              # locale family
+    "TMPDIR",
+    "XDG_*",             # XDG base dirs
+    "EDITOR",
+    "VISUAL",
+
+    # ── Git ───────────────────────────────────────────────────────────
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_EDITOR",
+
+    # ── Rust / Cargo ─────────────────────────────────────────────────
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "RUST_BACKTRACE",
+    "RUST_LOG",
+    "RUSTFLAGS",
+    "CARGO_TARGET_DIR",
+    "CARGO_INCREMENTAL",
+
+    # ── Node / npm / TypeScript ──────────────────────────────────────
+    "NODE_ENV",
+    "NODE_PATH",
+    "NODE_OPTIONS",
+    "NPM_CONFIG_PREFIX",
+    "NPM_CONFIG_CACHE",
+    "COREPACK_HOME",
+
+    # ── Python ───────────────────────────────────────────────────────
+    "VIRTUAL_ENV",
+    "PYTHONPATH",
+    "PYTHONDONTWRITEBYTECODE",
+    "PIP_CACHE_DIR",
+    "CONDA_PREFIX",
+    "CONDA_DEFAULT_ENV",
+    "UV_CACHE_DIR",
+
+    # ── Build tooling (common across stacks) ─────────────────────────
+    "CC",
+    "CXX",
+    "PKG_CONFIG_PATH",
+    "MAKEFLAGS",
+    "CMAKE_PREFIX_PATH",
+]
+
+
+################################################################################
+# Sandbox — Workspace Write Settings
+################################################################################
+# These apply when the active profile uses sandbox_mode = "workspace-write".
+
+[sandbox_workspace_write]
+
+# Builds (cargo, npm, pip) need to fetch packages from registries.
+network_access = true
+
+# Rust and Node toolchains write intermediate artifacts to temp dirs.
+exclude_tmpdir_env_var = true
+exclude_slash_tmp = true
+
+# Additional writable dirs outside the workspace.
+# Uncomment if your toolchain writes to global caches and builds fail.
+# writable_roots = [
+#     "~/.cargo/registry",
+#     "~/.rustup",
+#     "~/.npm",
+#     "~/.cache/pip",
+# ]

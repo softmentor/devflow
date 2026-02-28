@@ -1,0 +1,14 @@
+[project]
+name = "rust-lib"
+stack = ["rust"]
+
+[runtime]
+profile = "auto"
+
+[targets]
+pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
+main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration", "test:smoke"]
+
+[extensions.rust]
+source = "builtin"
+required = true

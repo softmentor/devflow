@@ -1,0 +1,23 @@
+[workspace]
+members = [
+  "crates/devflow-core",
+  "crates/devflow-cli",
+  "crates/devflow-policy",
+  "crates/devflow-gh",
+  "crates/devflow-ext-rust",
+  "crates/devflow-ext-node", "examples/rust-lib",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Soft Mentor"]
+
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+thiserror = "2"

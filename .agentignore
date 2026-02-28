@@ -1,0 +1,21 @@
+# ~/.agentignore or <project-root>/.agentignore
+
+# Security & Secrets
+.env*
+*.pem
+*.key
+auth.json
+
+# Rust specific
+/target/
+**/*.rs.bk
+
+# NPM / TypeScript specific
+node_modules/
+dist/
+build/
+.tscache/
+
+# Documentation build artifacts (MyST)
+_build/
+.myst/

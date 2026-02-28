@@ -1,0 +1,17 @@
+[project]
+name = "my-typescript-project"
+stack = ["node"]
+
+[runtime]
+profile = "auto"
+
+[targets]
+pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
+main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
+
+[extensions.node]
+source = "builtin"
+required = true
+
+# Ensure your package.json scripts expose these selectors:
+# fmt:check, lint, build, test:unit, test:integration

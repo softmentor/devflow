@@ -1,0 +1,11 @@
+# label: devflow.abbreviations
+version: 1
+project:
+  abbreviations:
+    ADR: Architecture Decision Record.
+    API: Application Programming Interface.
+    CI: Continuous Integration.
+    CLI: Command Line Interface.
+    DAG: Directed Acyclic Graph.
+    GHCR: GitHub Container Registry.
+    PR: Pull Request.
