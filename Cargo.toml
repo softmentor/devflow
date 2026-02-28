@@ -5,7 +5,7 @@ members = [
   "crates/devflow-policy",
   "crates/devflow-gh",
   "crates/devflow-ext-rust",
-  "crates/devflow-ext-node",
+  "crates/devflow-ext-node", "examples/rust-lib",
 ]
 resolver = "2"
 

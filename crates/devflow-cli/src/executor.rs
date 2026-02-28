@@ -48,34 +48,15 @@ fn with_default_selector(command: &CommandRef) -> CommandRef {
         return command.clone();
     }
 
-    let selector = match command.primary {
-        PrimaryCommand::Setup => "doctor",
-        PrimaryCommand::Fmt => "check",
-        PrimaryCommand::Lint => "static",
-        PrimaryCommand::Build => "debug",
-        PrimaryCommand::Test => "unit",
-        PrimaryCommand::Package => "artifact",
-        PrimaryCommand::Check => "pr",
-        PrimaryCommand::Release => "candidate",
-        PrimaryCommand::Ci => "check",
-        PrimaryCommand::Init => "rust",
-    };
-
     CommandRef {
         primary: command.primary,
-        selector: Some(selector.to_string()),
+        selector: Some(command.primary.default_selector().to_string()),
     }
 }
 
 fn stack_is_applicable(cfg: &DevflowConfig, stack: &str) -> bool {
     let base = cfg.source_dir.as_deref().unwrap_or(Path::new(""));
-    match stack {
-        "rust" => base.join("Cargo.toml").exists(),
-        "node" => base.join("package.json").exists(),
-        "custom" => base.join("justfile").exists() || base.join("Makefile").exists(),
-        // Subprocess extensions always apply initially; execution will fail if bad mapping
-        _ => true,
-    }
+    devflow_core::project::stack_is_applicable(base, stack)
 }
 
 fn map_command(
@@ -166,5 +147,52 @@ mod tests {
         // Verifies that if a selector is already present, it is not overwritten by defaults.
         let out = with_default_selector(&cmd(PrimaryCommand::Test, Some("integration")));
         assert_eq!(out.canonical(), "test:integration");
+    }
+
+    #[test]
+    fn unit_test_map_custom_translates_selectors() {
+        // map_custom depends on filesystem state (justfile/Makefile).
+        // Since those don't exist in the standard test dir by default, it usually falls back.
+        // We will test the fallback behavior here.
+        let out = map_custom(&cmd(PrimaryCommand::Setup, Some("doctor"))).unwrap();
+        assert_eq!(out.program, "echo");
+        assert!(out.args[0].contains("custom stack requires"));
+
+        // Unhandled commands return None in the default fallback
+        assert!(map_custom(&cmd(PrimaryCommand::Build, Some("debug"))).is_none());
+    }
+
+    #[test]
+    fn integration_test_run_action_success() {
+        let action = ExecutionAction {
+            program: "echo".to_string(),
+            args: vec!["hello".to_string(), "world".to_string()],
+        };
+        // Should succeed without error
+        assert!(run_action(&action).is_ok());
+    }
+
+    #[test]
+    fn integration_test_run_action_failure() {
+        let action = ExecutionAction {
+            program: "false".to_string(), // Typical unix command that always fails
+            args: vec![],
+        };
+        let result = run_action(&action);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("command failed with status"));
+    }
+
+    #[test]
+    fn integration_test_run_action_invalid_program() {
+        let action = ExecutionAction {
+            program: "this-program-definitely-does-not-exist-123".to_string(),
+            args: vec![],
+        };
+        let result = run_action(&action);
+        assert!(result.is_err());
     }
 }

@@ -88,3 +88,74 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
         args: args.iter().map(|s| s.to_string()).collect(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use devflow_core::PrimaryCommand;
+
+    fn cmd(primary: PrimaryCommand, selector: Option<&str>) -> CommandRef {
+        CommandRef {
+            primary,
+            selector: selector.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn smoke_test_extension_instantiation() {
+        let ext = RustExtension::new();
+        assert_eq!(ext.name(), "rust");
+    }
+
+    #[test]
+    fn unit_test_capabilities_exist() {
+        let ext = RustExtension::new();
+        let caps = ext.capabilities();
+        assert!(caps.contains("build:release"));
+        assert!(caps.contains("test:smoke"));
+        assert!(caps.contains("fmt:check"));
+    }
+
+    #[test]
+    fn unit_test_valid_build_actions() {
+        let ext = RustExtension::new();
+
+        let tests = vec![
+            (
+                cmd(PrimaryCommand::Setup, Some("doctor")),
+                "cargo --version",
+            ),
+            (
+                cmd(PrimaryCommand::Build, Some("release")),
+                "cargo build --release",
+            ),
+            (
+                cmd(PrimaryCommand::Test, Some("integration")),
+                "cargo test --tests",
+            ),
+            (cmd(PrimaryCommand::Fmt, Some("fix")), "cargo fmt --all"),
+        ];
+
+        for (input_cmd, expected_shell) in tests {
+            let action = ext
+                .build_action(&input_cmd)
+                .expect("Expected valid action mapping");
+            let actual_shell = format!("{} {}", action.program, action.args.join(" "));
+            assert_eq!(actual_shell, expected_shell);
+        }
+    }
+
+    #[test]
+    fn unit_test_invalid_build_actions_return_none() {
+        let ext = RustExtension::new();
+
+        let invalid_cmds = vec![
+            cmd(PrimaryCommand::Build, Some("unknown-target")),
+            cmd(PrimaryCommand::Package, Some("docker")),
+        ];
+
+        for input_cmd in invalid_cmds {
+            assert!(ext.build_action(&input_cmd).is_none());
+        }
+    }
+}

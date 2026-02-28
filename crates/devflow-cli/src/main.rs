@@ -144,3 +144,81 @@ fn write_ci_workflow(path: &str, content: &str) -> Result<()> {
 fn read_ci_workflow(path: &str) -> Result<String> {
     fs::read_to_string(path).with_context(|| format!("failed to read '{}'", path))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use devflow_core::config::{ProjectConfig, RuntimeConfig};
+    use tempfile::tempdir;
+
+    fn test_cfg() -> DevflowConfig {
+        let mut profiles = std::collections::HashMap::new();
+        profiles.insert("pr".to_string(), vec!["test:unit".to_string()]);
+
+        DevflowConfig {
+            project: ProjectConfig {
+                name: "test-main".to_string(),
+                stack: vec!["rust".to_string()],
+            },
+            runtime: RuntimeConfig::default(),
+            targets: devflow_core::config::TargetsConfig { profiles },
+            extensions: None,
+            container: None,
+            cache: None,
+            source_dir: None,
+        }
+    }
+
+    fn test_cli(ci_output: &str) -> Cli {
+        Cli {
+            command: "ci".to_string(),
+            selector: None,
+            config: "devflow.toml".to_string(),
+            stdout: true,
+            ci_output: ci_output.to_string(),
+            force: false,
+        }
+    }
+
+    #[test]
+    fn smoke_test_execute_ci_plan() {
+        let cfg = test_cfg();
+        let registry = ExtensionRegistry::default();
+        let cmd = CommandRef::from_str("ci:plan").unwrap();
+        let cli = test_cli("none");
+
+        // Should print CI plan logic without failing
+        assert!(execute(&cli, &cfg, &registry, &cmd).is_ok());
+    }
+
+    #[test]
+    fn smoke_test_execute_ci_generate_stdout() {
+        let cfg = test_cfg();
+        let registry = ExtensionRegistry::default();
+        let cmd = CommandRef::from_str("ci:generate").unwrap();
+        let mut cli = test_cli("none");
+        cli.stdout = true;
+
+        // Should print generated workflows without filesystem interaction
+        execute(&cli, &cfg, &registry, &cmd).expect("execute ci:generate stdout failed");
+    }
+
+    #[test]
+    fn integration_test_execute_ci_generate_filesystem() {
+        let dir = tempdir().unwrap();
+        let ci_path = dir.path().join("ci.yml");
+
+        let cfg = test_cfg();
+        let registry = ExtensionRegistry::default();
+        let cmd = CommandRef::from_str("ci:generate").unwrap();
+
+        // Write to filesystem
+        let mut cli = test_cli(ci_path.to_str().unwrap());
+        cli.stdout = false;
+
+        execute(&cli, &cfg, &registry, &cmd).expect("execute ci:generate filesystem failed");
+        assert!(ci_path.exists());
+        let content = fs::read_to_string(&ci_path).unwrap();
+        assert!(content.contains("test:unit"));
+    }
+}

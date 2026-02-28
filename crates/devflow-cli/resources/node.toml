@@ -1,0 +1,14 @@
+[project]
+name = "my-node-project"
+stack = ["node"]
+
+[runtime]
+profile = "auto"
+
+[targets]
+pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
+main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
+
+[extensions.node]
+source = "builtin"
+required = true

@@ -75,3 +75,68 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
         args: args.iter().map(|s| s.to_string()).collect(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use devflow_core::PrimaryCommand;
+
+    fn cmd(primary: PrimaryCommand, selector: Option<&str>) -> CommandRef {
+        CommandRef {
+            primary,
+            selector: selector.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn smoke_test_extension_instantiation() {
+        let ext = NodeExtension::new();
+        assert_eq!(ext.name(), "node");
+    }
+
+    #[test]
+    fn unit_test_capabilities_exist() {
+        let ext = NodeExtension::new();
+        let caps = ext.capabilities();
+        assert!(caps.contains("build:debug"));
+        assert!(caps.contains("setup"));
+        assert!(caps.contains("lint:static"));
+    }
+
+    #[test]
+    fn unit_test_valid_build_actions() {
+        let ext = NodeExtension::new();
+
+        let tests = vec![
+            (cmd(PrimaryCommand::Setup, Some("deps")), "npm ci"),
+            (cmd(PrimaryCommand::Lint, Some("static")), "npm run lint"),
+            (cmd(PrimaryCommand::Test, Some("unit")), "npm run test:unit"),
+            (
+                cmd(PrimaryCommand::Package, Some("artifact")),
+                "npm pack --dry-run",
+            ),
+        ];
+
+        for (input_cmd, expected_shell) in tests {
+            let action = ext
+                .build_action(&input_cmd)
+                .expect("Expected valid action mapping");
+            let actual_shell = format!("{} {}", action.program, action.args.join(" "));
+            assert_eq!(actual_shell, expected_shell);
+        }
+    }
+
+    #[test]
+    fn unit_test_invalid_build_actions_return_none() {
+        let ext = NodeExtension::new();
+
+        let invalid_cmds = vec![
+            cmd(PrimaryCommand::Fmt, Some("format")), // fmt:check and fmt:fix exist, not fmt:format
+            cmd(PrimaryCommand::Setup, Some("toolchain")),
+        ];
+
+        for input_cmd in invalid_cmds {
+            assert!(ext.build_action(&input_cmd).is_none());
+        }
+    }
+}

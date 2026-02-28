@@ -8,12 +8,25 @@ use tracing::{info, instrument};
 /// Runs the `init` command to bootstrap a new Devflow project.
 #[instrument(skip(cli))]
 pub fn run(cli: &Cli, template_selector: Option<&str>) -> Result<()> {
-    let template = match template_selector {
-        Some(value) => InitTemplate::from_str(value)?,
-        None => detect_template()?,
+    let config_path = Path::new(&cli.config);
+    let parent = config_path.parent().unwrap_or_else(|| Path::new(""));
+    let target_dir = if parent.as_os_str().is_empty() {
+        std::env::current_dir()?
+    } else {
+        parent.to_path_buf()
     };
 
-    let config_content = template.render_config();
+    let project_name = target_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "devflow-project".to_string());
+
+    let template = match template_selector {
+        Some(value) => InitTemplate::from_str(value)?,
+        None => detect_template(&target_dir)?,
+    };
+
+    let config_content = template.render_config(&project_name);
     write_if_absent(&cli.config, &config_content, cli.force)
         .with_context(|| format!("failed to write '{}'", cli.config))?;
 
@@ -74,89 +87,34 @@ impl InitTemplate {
         }
     }
 
-    fn render_config(self) -> String {
-        match self {
-            Self::Rust => r#"[project]
-name = "my-rust-project"
-stack = ["rust"]
+    fn render_config(self, project_name: &str) -> String {
+        let template = match self {
+            Self::Rust => include_str!("../resources/rust.toml"),
+            Self::Node => include_str!("../resources/node.toml"),
+            Self::Tsc => include_str!("../resources/tsc.toml"),
+            Self::Kotlin => include_str!("../resources/kotlin.toml"),
+        };
 
-[runtime]
-profile = "auto"
-
-[targets]
-pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
-main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration", "test:smoke"]
-
-[extensions.rust]
-source = "builtin"
-required = true
-"#
-            .to_string(),
-            Self::Node => r#"[project]
-name = "my-node-project"
-stack = ["node"]
-
-[runtime]
-profile = "auto"
-
-[targets]
-pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
-main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
-
-[extensions.node]
-source = "builtin"
-required = true
-"#
-            .to_string(),
-            Self::Tsc => r#"[project]
-name = "my-typescript-project"
-stack = ["node"]
-
-[runtime]
-profile = "auto"
-
-[targets]
-pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
-main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
-
-[extensions.node]
-source = "builtin"
-required = true
-
-# Ensure your package.json scripts expose these selectors:
-# fmt:check, lint, build, test:unit, test:integration
-"#
-            .to_string(),
-            Self::Kotlin => r#"[project]
-name = "my-kotlin-project"
-stack = ["custom"]
-
-[runtime]
-profile = "host"
-
-[targets]
-pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
-main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
-
-# Custom stack delegates canonical selectors to just/make targets.
-# Implement matching targets in justfile or Makefile:
-# fmt-check, lint-static, build-debug, test-unit, test-integration
-"#
-            .to_string(),
-        }
+        template
+            .replace("my-rust-project", project_name)
+            .replace("my-node-project", project_name)
+            .replace("my-typescript-project", project_name)
+            .replace("my-kotlin-project", project_name)
     }
 }
 
-fn detect_template() -> Result<InitTemplate> {
-    if Path::new("Cargo.toml").exists() {
+fn detect_template(base_path: &Path) -> Result<InitTemplate> {
+    use devflow_core::constants::{MANIFEST_NODE, MANIFEST_RUST, MANIFEST_TSC};
+
+    if base_path.join(MANIFEST_RUST).exists() {
         return Ok(InitTemplate::Rust);
     }
 
-    if Path::new("tsconfig.json").exists() {
+    if base_path.join(MANIFEST_TSC).exists() {
         return Ok(InitTemplate::Tsc);
     }
 
-    if Path::new("package.json").exists() {
+    if base_path.join(MANIFEST_NODE).exists() {
         return Ok(InitTemplate::Node);
     }
 
@@ -182,4 +140,89 @@ fn write_if_absent(path: &str, content: &str, force: bool) -> Result<()> {
 
     fs::write(output, content)
         .with_context(|| format!("failed to write file '{}'", output.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn test_cli(dir: &Path) -> Cli {
+        Cli {
+            command: "init".to_string(),
+            selector: None,
+            config: dir.join("devflow.toml").to_str().unwrap().to_string(),
+            stdout: false,
+            ci_output: dir
+                .join(".github/workflows/ci.yml")
+                .to_str()
+                .unwrap()
+                .to_string(),
+            force: false,
+        }
+    }
+
+    #[test]
+    fn unit_test_detect_template() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+
+        // Fails if no indicators
+        assert!(detect_template(base).is_err());
+
+        // Detects Node
+        fs::write(base.join("package.json"), "{}").unwrap();
+        assert!(matches!(detect_template(base).unwrap(), InitTemplate::Node));
+
+        // If Cargo.toml also exists, it should prefer Rust
+        fs::write(base.join("Cargo.toml"), "").unwrap();
+        assert!(matches!(detect_template(base).unwrap(), InitTemplate::Rust));
+    }
+
+    #[test]
+    fn unit_test_write_if_absent() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt").to_str().unwrap().to_string();
+
+        // Successful write
+        assert!(write_if_absent(&file_path, "hello", false).is_ok());
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "hello");
+
+        // Fail to overwrite existing file without force
+        assert!(write_if_absent(&file_path, "world", false).is_err());
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "hello");
+
+        // Successful overwrite with force
+        assert!(write_if_absent(&file_path, "world", true).is_ok());
+        assert_eq!(fs::read_to_string(&file_path).unwrap(), "world");
+    }
+
+    #[test]
+    fn integration_test_init_run_success() {
+        let dir = tempdir().unwrap();
+        let mut cli = test_cli(dir.path());
+
+        // Run against an explicit template
+        let result = run(&cli, Some("rust"));
+        assert!(result.is_ok());
+
+        // Verify files were generated
+        assert!(Path::new(&cli.config).exists());
+        assert!(Path::new(&cli.ci_output).exists());
+
+        let dir_name = dir.path().file_name().unwrap().to_str().unwrap();
+
+        let config_str = fs::read_to_string(&cli.config).unwrap();
+        assert!(config_str.contains(dir_name));
+
+        // Ensure running again without force fails on the existing configuration
+        let duplicate_run = run(&cli, Some("rust"));
+        assert!(duplicate_run.is_err());
+
+        // Applying force overrides the configuration
+        cli.force = true;
+        assert!(run(&cli, Some("node")).is_ok());
+        let updated_config = fs::read_to_string(&cli.config).unwrap();
+        assert!(updated_config.contains(dir_name));
+    }
 }

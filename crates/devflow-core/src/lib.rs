@@ -5,7 +5,9 @@
 
 pub mod command;
 pub mod config;
+pub mod constants;
 pub mod extension;
+pub mod project;
 pub mod runtime;
 
 pub use command::{CommandRef, PrimaryCommand};

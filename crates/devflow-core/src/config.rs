@@ -202,4 +202,78 @@ mod tests {
             toml::from_str::<DevflowConfig>(text).expect_err("must reject unknown project key");
         assert!(err.to_string().contains("owner"));
     }
+
+    #[test]
+    fn unit_test_validate_rejects_unsupported_stack() {
+        let text = r#"
+        [project]
+        name = "invalid-stack"
+        stack = ["ruby"]
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let err = cfg
+            .validate()
+            .expect_err("Must fail validation for unsupported stack");
+        assert!(err.to_string().contains("unsupported stack 'ruby'"));
+    }
+
+    #[test]
+    fn unit_test_validate_rejects_invalid_commands() {
+        let text = r#"
+        [project]
+        name = "bad-commands"
+        stack = ["rust"]
+
+        [targets]
+        pr = ["build:debug", "not-a-command:selector"]
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let err = cfg
+            .validate()
+            .expect_err("Must fail validation for invalid command format");
+
+        // CommandRef from_str returns an error because primary command is unknown
+        assert!(err
+            .to_string()
+            .contains("invalid command 'not-a-command:selector'"));
+    }
+
+    #[test]
+    fn integration_test_load_from_file_anchors_source_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("devflow.toml");
+
+        let text = r#"
+        [project]
+        name = "success-load"
+        stack = ["node"]
+        "#;
+
+        std::fs::write(&config_path, text).unwrap();
+
+        // Should successfully parse, validate, and anchor `source_dir`
+        let cfg = DevflowConfig::load_from_file(config_path.to_str().unwrap()).unwrap();
+        assert_eq!(cfg.project.name, "success-load");
+        assert_eq!(cfg.project.stack, vec!["node"]);
+        assert_eq!(cfg.source_dir, Some(dir.path().to_path_buf()));
+    }
+
+    #[test]
+    fn security_boundary_test_load_missing_or_malformed_file() {
+        // Missing file
+        let err = DevflowConfig::load_from_file("/tmp/nonexistent-devflow-random-file.toml")
+            .expect_err("Missing file should return an error, not panic");
+        assert!(err.to_string().contains("failed to read config file"));
+
+        // Malformed TOML file
+        let dir = tempfile::tempdir().unwrap();
+        let malformed_path = dir.path().join("malformed.toml");
+        std::fs::write(&malformed_path, "[project\nname=\"missing-bracket\"").unwrap();
+
+        let err = DevflowConfig::load_from_file(malformed_path.to_str().unwrap())
+            .expect_err("Malformed TOML should return an error, not panic");
+        assert!(err.to_string().contains("failed to parse TOML"));
+    }
 }

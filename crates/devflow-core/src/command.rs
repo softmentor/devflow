@@ -46,6 +46,22 @@ impl PrimaryCommand {
             Self::Ci => "ci",
         }
     }
+
+    /// Returns the default selector to be used if none is explicitly provided.
+    pub fn default_selector(self) -> &'static str {
+        match self {
+            Self::Setup => "doctor",
+            Self::Fmt => "check",
+            Self::Lint => "static",
+            Self::Build => "debug",
+            Self::Test => "unit",
+            Self::Package => "artifact",
+            Self::Check => "pr",
+            Self::Release => "candidate",
+            Self::Ci => "check",
+            Self::Init => "rust",
+        }
+    }
 }
 
 /// A reference to a Devflow command, including its primary type and an optional selector.
