@@ -66,6 +66,19 @@ impl Extension for NodeExtension {
             _ => None,
         }
     }
+
+    fn cache_mounts(&self) -> Vec<String> {
+        vec!["node/npm:/root/.npm".to_string()]
+    }
+
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        vec![
+            "package-lock.json".to_string(),
+            "yarn.lock".to_string(),
+            "pnpm-lock.yaml".to_string(),
+            "package.json".to_string(),
+        ]
+    }
 }
 
 /// Helper for constructing `ExecutionAction`s concisely.

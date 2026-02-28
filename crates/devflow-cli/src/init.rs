@@ -30,6 +30,13 @@ pub fn run(cli: &Cli, template_selector: Option<&str>) -> Result<()> {
     write_if_absent(&cli.config, &config_content, cli.force)
         .with_context(|| format!("failed to write '{}'", cli.config))?;
 
+    if let Some(dockerfile_content) = template.render_dockerfile() {
+        let dockerfile_path = target_dir.join("Dockerfile.devflow");
+        let df_str = dockerfile_path.to_str().unwrap();
+        // Ignore failures if the Dockerfile already exists, this is non-critical scaffolding
+        let _ = write_if_absent(df_str, dockerfile_content, cli.force);
+    }
+
     let cfg = devflow_core::DevflowConfig::load_from_file(&cli.config)?;
     let workflow = devflow_gh::render_workflow(&cfg)?;
 
@@ -100,6 +107,14 @@ impl InitTemplate {
             .replace("my-node-project", project_name)
             .replace("my-typescript-project", project_name)
             .replace("my-kotlin-project", project_name)
+    }
+
+    fn render_dockerfile(self) -> Option<&'static str> {
+        match self {
+            Self::Rust => Some(include_str!("../resources/Dockerfile.rust")),
+            Self::Node | Self::Tsc => Some(include_str!("../resources/Dockerfile.node")),
+            Self::Kotlin => None,
+        }
     }
 }
 
