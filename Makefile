@@ -32,8 +32,29 @@ package:
 check: verify
 	@echo "✓ PR verification passed. Branch is ready for merging."
 
+# Helper to ensure Cargo.toml and myst.yml versions are synchronized
+verify-versions:
+	@echo "Verifying version synchronization..."
+	@CARGO_VER=$$(grep '^version = ' Cargo.toml | head -n 1 | sed -E 's/version = "([^"]+)"/\1/'); \
+	MYST_VER=$$(grep 'logo_text: Devflow v' docs/myst.yml | head -n 1 | sed -E 's/.*logo_text: Devflow v([0-9\.]+)/\1/'); \
+	if [ -z "$$CARGO_VER" ]; then echo "Error: Could not extract version from Cargo.toml"; exit 1; fi; \
+	if [ "$$CARGO_VER" != "$$MYST_VER" ]; then \
+		echo "Error: Version mismatch! Cargo.toml=$$CARGO_VER, myst.yml=$$MYST_VER"; \
+		exit 1; \
+	fi; \
+	echo "✓ Versions are synchronized ($$CARGO_VER)"
+
+# Helper to ensure there are no uncommitted changes
+verify-clean:
+	@echo "Verifying working tree is clean..."
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Error: Working tree is not clean. Please commit or stash your changes."; \
+		exit 1; \
+	fi
+	@echo "✓ Working tree is clean."
+
 # Automates creating a PR from the current branch to main using the GitHub CLI
-pr: check
+pr: check verify-clean
 	@echo "Creating Pull Request to main..."
 	gh pr create --base main --title "chore: release $$(git branch --show-current | sed 's/rel\///')" --fill
 
@@ -70,7 +91,7 @@ dev: fmt lint test
 
 # Comprehensive check: formatting check, lint, build, and run tests.
 # Useful for local verification before pushing.
-verify: fmt-check lint build test
+verify: fmt-check lint build test verify-versions
 
 # The works: formatting, linting, building, testing, and coverage.
 all: fmt lint build test coverage docs
