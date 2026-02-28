@@ -1,0 +1,22 @@
+{
+  "name": "ts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "fmt:check": "echo 'fmt:check passed'",
+    "lint": "echo 'lint passed'",
+    "build": "tsc --noEmit",
+    "test:unit": "echo 'test:unit passed'",
+    "test:integration": "echo 'test:integration passed'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

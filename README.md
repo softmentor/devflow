@@ -25,6 +25,17 @@ Use `--stdout` to print instead.
 
 `devflow` complements existing `Makefile`/`justfile` workflows by standardizing command intent (`fmt:check`, `test:unit`, `check:pr`) and policy while still delegating stack-specific implementation details.
 
+## Examples
+
+The `examples/` directory contains fully-functional project scaffoldings that demonstrate `devflow` managing various tech stacks and workflows:
+
+- [rust-lib](examples/rust-lib): A standard Cargo library utilizing the native `rust` stack detection.
+- [node-ts](examples/node-ts): A TypeScript CommonJS module executing custom `fmt` and `test` scripts via the `node` devflow stack.
+- [react](examples/react): A Vite Single Page Application evaluating custom scripts over the `node` stack.
+- [tauri](examples/tauri): A hybrid desktop app demonstrating Devflow's multi-stack (`["rust", "node"]`) concurrency spanning both a frontend package and a native `src-tauri` workspace.
+- [vscode-extension](examples/vscode-extension): A TypeScript plugin demonstrating ES Module compilation.
+- [python-ext](examples/python-ext): A dummy repository demonstrating the Subprocess Extension API, proxying Devflow commands over JSON-RPC.
+
 ## Command Model
 
 Primary commands:

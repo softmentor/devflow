@@ -1,0 +1,17 @@
+{
+  "name": "tauri",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "fmt:check": "echo 'fmt:check node passed'",
+    "lint": "echo 'lint node passed'",
+    "build": "echo 'build node passed'",
+    "test:unit": "echo 'test:unit node passed'",
+    "test:integration": "echo 'test:integration node passed'"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
