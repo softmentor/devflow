@@ -13,6 +13,8 @@ jobs:
     needs: [prep]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf build:debug
 
   check_fmt_check:
@@ -20,6 +22,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf fmt:check
 
   check_lint_static:
@@ -27,6 +31,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf lint:static
 
   check_build_debug:
@@ -34,6 +40,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf build:debug
 
   check_test_unit:
@@ -41,6 +49,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf test:unit
 
   check_test_integration:
@@ -48,6 +58,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+      - name: Bootstrap dwf
+        run: cargo install --path crates/devflow-cli --debug
       - run: dwf test:integration
 
 # project: devflow
