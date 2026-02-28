@@ -9,8 +9,19 @@ permissions:
   contents: write
 
 jobs:
+  run-ci:
+    name: Run CI Pipeline
+    uses: ./.github/workflows/ci.yml
+
+  run-docs:
+    name: Build & Deploy Docs
+    needs: run-ci
+    uses: ./.github/workflows/docs.yml
+    secrets: inherit
+
   build-and-release:
     name: Build & Release Binary
+    needs: [run-ci, run-docs]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
