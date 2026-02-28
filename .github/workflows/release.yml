@@ -89,18 +89,4 @@ jobs:
             dwf-${{ matrix.target }}.tar.gz
             dwf-${{ matrix.target }}.tar.gz.sha256
 
-  homebrew:
-    name: Bump Homebrew Formula
-    needs: build-and-release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Bump Homebrew formula
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: devflow
-          formula-path: Formula/devflow.rb
-          homebrew-tap: softmentor/homebrew-tap
-          download-url: https://github.com/softmentor/devflow/releases/download/${{ github.ref_name }}/dwf-x86_64-apple-darwin.tar.gz
-        env:
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
