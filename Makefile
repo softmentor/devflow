@@ -32,12 +32,26 @@ package:
 check: verify
 	@echo "✓ PR verification passed. Branch is ready for merging."
 
-# Helper to automatically tag the v0.1.0 release cleanly (run this after merging to main)
+# Automates creating a PR from the current branch to main using the GitHub CLI
+pr: check
+	@echo "Creating Pull Request to main..."
+	gh pr create --base main --title "chore: release $$(git branch --show-current | sed 's/rel\///')" --fill
+
+# Automates checking out main, pulling, tagging, and pushing to trigger GitHub Actions
+tag:
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is not set. Usage: make tag VERSION=v0.1.0"; exit 1; fi
+	@echo "Checking out main and pulling latest changes..."
+	git checkout main
+	git pull origin main
+	@echo "Tagging release $(VERSION)..."
+	git tag -a "$(VERSION)" -m "chore: release $(VERSION)"
+	@echo "Pushing tag $(VERSION) to origin..."
+	git push origin "$(VERSION)"
+	@echo "✓ Tag $(VERSION) pushed successfully! Release pipelines are triggering."
+
+# Backwards compatibility alias
 release:
-	@echo "Preparing to tag a new release..."
-	@git tag -a "v0.1.0" -m "chore: release v0.1.0"
-	@echo "Tag created. Push to trigger GitHub Actions release pipelines:"
-	@echo "  git push origin v0.1.0"
+	@echo "Please use 'make tag VERSION=v0.1.0' instead."
 
 ci-generate:
 	cargo run -p devflow-cli -- ci:generate
