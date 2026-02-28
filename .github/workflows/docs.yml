@@ -28,7 +28,7 @@ jobs:
         
       - name: Build docs
         working-directory: docs
-        run: myst build --html
+        run: BASE_URL=/devflow myst build --html
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v3
