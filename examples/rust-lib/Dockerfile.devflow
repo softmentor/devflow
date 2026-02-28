@@ -28,19 +28,11 @@ LABEL org.opencontainers.image.description="Devflow Rust Toolchain (rustc, nexte
 # Inherit OS base
 COPY --from=base / /
 
-# Install cargo-nextest and sccache dynamically based on architecture for high speed CI
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "aarch64" ]; then \
-        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-aarch64-unknown-linux-gnu.tar.gz" ; \
-        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-aarch64-unknown-linux-musl.tar.gz" ; \
-        SCCACHE_FOLDER="sccache-v0.8.1-aarch64-unknown-linux-musl" ; \
-    else \
-        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-x86_64-unknown-linux-gnu.tar.gz" ; \
-        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-x86_64-unknown-linux-musl.tar.gz" ; \
-        SCCACHE_FOLDER="sccache-v0.8.1-x86_64-unknown-linux-musl" ; \
-    fi && \
-    curl -LsSf $NEXTEST_URL | tar zxf - -C /usr/local/bin && \
-    curl -LsSf $SCCACHE_URL | tar zxf - --strip-components=1 -C /usr/local/bin $SCCACHE_FOLDER/sccache
+# Install cargo-nextest (pinned version) for high speed testing (leveraged natively by devflow-ext-rust)
+RUN curl -LsSf https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-x86_64-unknown-linux-gnu.tar.gz | tar zxf - -C /usr/local/bin
+
+# Install sccache for compilation caching
+RUN curl -LsSf https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-x86_64-unknown-linux-musl.tar.gz | tar zxf - --strip-components=1 -C /usr/local/bin sccache-v0.8.1-x86_64-unknown-linux-musl/sccache
 
 ENV RUSTC_WRAPPER=sccache
 

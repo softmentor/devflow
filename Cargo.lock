@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "devflow-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "devflow-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "criterion",
@@ -307,21 +307,21 @@ dependencies = [
 
 [[package]]
 name = "devflow-ext-node"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "devflow-core",
 ]
 
 [[package]]
 name = "devflow-ext-rust"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "devflow-core",
 ]
 
 [[package]]
 name = "devflow-gh"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "devflow-core",
@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "devflow-policy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "devflow-core",
@@ -710,7 +710,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "rust-lib"
-version = "0.1.0"
+version = "0.0.0-latest"
 
 [[package]]
 name = "rustix"

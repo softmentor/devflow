@@ -27,7 +27,17 @@ jobs:
         
       - name: Build docs
         working-directory: docs
-        run: BASE_URL=/devflow myst build --html
+        run: myst build --html
+        env:
+          BASE_URL: "/devflow"
+
+      - name: Build rustdoc
+        run: cargo doc --workspace --no-deps
+
+      - name: Bundle rustdoc into MyST
+        run: |
+          mkdir -p docs/_build/html/rustdoc
+          cp -r target/doc/* docs/_build/html/rustdoc/
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v3

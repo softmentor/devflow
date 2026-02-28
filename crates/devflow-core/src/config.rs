@@ -24,10 +24,10 @@ pub struct DevflowConfig {
     pub targets: TargetsConfig,
     /// Optional extension configurations.
     pub extensions: Option<HashMap<String, ExtensionConfig>>,
-    /// Container configuration placeholders (for future use).
+    /// Container configuration for execution proxies.
     #[serde(default)]
     pub container: Option<ContainerConfig>,
-    /// Cache configuration placeholders (for future use).
+    /// Cache configuration for build artifact management.
     #[serde(default)]
     pub cache: Option<CacheConfig>,
     /// Path to the directory containing this config file, used to anchor relative paths.
@@ -59,17 +59,8 @@ impl DevflowConfig {
 
     /// Validates the configuration for logical consistency.
     fn validate(&self) -> Result<()> {
-        for stack in &self.project.stack {
-            match stack.as_str() {
-                "rust" | "node" | "custom" => {}
-                other => {
-                    return Err(anyhow!(
-                        "unsupported stack '{}' (supported: rust,node,custom)",
-                        other
-                    ));
-                }
-            }
-        }
+        // Devflow Core is stack-agnostic. We allow any stack name here, as long as
+        // an extension (builtin or subprocess) registers to handle it during runtime execution.
 
         for (profile, commands) in &self.targets.profiles {
             for raw in commands {
@@ -117,22 +108,28 @@ pub enum ContainerEngine {
     Auto,
 }
 
-/// Configuration for container environments.
+/// Configuration for containerized execution environments.
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ContainerConfig {
+    /// Optional container image name (e.g., "my-project-ci").
+    /// If not provided, a default base image may be used.
     pub image: Option<String>,
+    /// The container engine to use (e.g., "docker", "podman").
     #[serde(default)]
     pub engine: ContainerEngine,
+    /// List of file paths to include in the container's fingerprint calculation.
     #[serde(default)]
     pub fingerprint_inputs: Vec<String>,
 }
 
-/// Configuration for build artifact caching.
+/// Configuration for build artifact and dependency caching.
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
+    /// The root directory for the Devflow cache (relative to source dir or absolute).
     pub root: Option<String>,
+    /// Reserved for future cache strategy selection (e.g., "local", "gha").
     pub strategy: Option<String>,
 }
 
@@ -218,18 +215,15 @@ mod tests {
     }
 
     #[test]
-    fn unit_test_validate_rejects_unsupported_stack() {
+    fn unit_test_validate_allows_custom_stacks() {
         let text = r#"
         [project]
-        name = "invalid-stack"
+        name = "valid-stack"
         stack = ["ruby"]
         "#;
 
         let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
-        let err = cfg
-            .validate()
-            .expect_err("Must fail validation for unsupported stack");
-        assert!(err.to_string().contains("unsupported stack 'ruby'"));
+        assert!(cfg.validate().is_ok());
     }
 
     #[test]

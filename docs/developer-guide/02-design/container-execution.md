@@ -45,8 +45,16 @@ When container execution issues arise, developers need clear visibility into the
 
 ## 5. Teardown and Cache Invalidations
 
-Developers risk exhausting their local disk space if abandoned container images and `$DWF_CACHE_ROOT` binaries accumulate unbounded over time.
+Developers risk exhausting their local disk space if abandoned container images and `$DWF_CACHE_ROOT` binaries accumulate unbounded over time. Because Devflow multi-stage builds aggressively pull OS and language toolchains, image storage can quickly reach tens of gigabytes.
 
-*   **Image Pruning**: The CLI executor leverages `--rm` on every `docker run` initialization to prevent stopped container leakage. However, large base images persist.
-*   **Cache Invalidation**: Devflow depends on toolchain-specific mechanisms inside the extensions to dictate cache pruning. (e.g., `sccache` manages its own LRU limits natively).
-*   **`dwf cache prune` (Roadmap)**: Devflow will eventually expose a top-level cache sub-command which sweeps the `DWF_CACHE_ROOT` and prunes directories older than a configured timestamp boundary, alongside dropping dangling docker/podman daemon images mapped to old, abandoned fingerprint hashes.
+*   **Image Volumes and External Disks**: To prevent `docker` or `podman` from filling up your primary laptop drive, we highly recommend mapping your engine's storage graph to a removable or secondary high-capacity drive. 
+    *   *Podman Example*: You can edit `~/.config/containers/storage.conf` to map your `graphroot` directly to an external volume:
+        ```ini
+        [storage]
+        driver = "overlay"
+        graphroot = "/Volumes/ExternalDrive/podman/applehv" # Example macOS path
+        # graphroot = "/var/lib/containers/storage"         # Example Linux path
+        ```
+*   **Routine Image Pruning**: The CLI executor leverages `--rm` on every `docker run` initialization to prevent stopped container metadata leakage. However, large base images persist. You should routinely execute `podman system prune -a --volumes` to sweep away orphaned Devflow fingerprinted images that are no longer referenced by active project branches.
+*   **Extension Cache Invalidation**: Devflow depends on toolchain-specific mechanisms inside the extensions to dictate cache volume pruning. For instance, `sccache` manages its own LRU cache limits natively, so Devflow's `$DWF_CACHE_ROOT/rust/sccache` will not grow infinitely.
+*   **`dwf cache prune` (Roadmap)**: Devflow will eventually expose a top-level cache sub-command which sweeps the `DWF_CACHE_ROOT` and prunes node_modules and cargo registry directories older than a configured timestamp boundary.

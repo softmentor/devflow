@@ -1,0 +1,9 @@
+FROM node:22.14.0-slim AS base
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    python3 \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace

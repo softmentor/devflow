@@ -60,7 +60,7 @@ pr: check verify-clean
 
 # Automates checking out main, pulling, tagging, and pushing to trigger GitHub Actions
 tag:
-	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is not set. Usage: make tag VERSION=v0.1.0"; exit 1; fi
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is not set. Usage: make tag VERSION=v0.2.0"; exit 1; fi
 	@echo "Checking out main and pulling latest changes..."
 	git checkout main
 	git pull origin main
@@ -72,7 +72,7 @@ tag:
 
 # Backwards compatibility alias
 release:
-	@echo "Please use 'make tag VERSION=v0.1.0' instead."
+	@echo "Please use 'make tag VERSION=v0.2.0' instead."
 
 ci-generate:
 	cargo run -p devflow-cli -- ci:generate
@@ -83,7 +83,16 @@ coverage:
 bench:
 	cargo bench
 
-docs:
+doc-myst:
+	@if command -v myst >/dev/null 2>&1; then \
+		echo "📚 Building MyST documentation..."; \
+		cd docs && myst build --html; \
+		echo "✅ Documentation built successfully."; \
+	else \
+		echo "⚠️  MyST not found, skipping documentation build."; \
+	fi
+
+docs: doc-myst
 	cargo doc --no-deps --workspace --open
 
 # Typical development flow: fix formatting, lint, and run tests.

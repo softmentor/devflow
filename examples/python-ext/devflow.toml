@@ -1,9 +1,9 @@
 [project]
 name = "python-ext"
-stack = ["custom"]
+stack = ["python"]
 
 [runtime]
-profile = "host"
+profile = "container"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
@@ -12,3 +12,12 @@ main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integrat
 # Custom stack delegates canonical selectors to just/make targets.
 # Implement matching targets in justfile or Makefile:
 # fmt-check, lint-static, build-debug, test-unit, test-integration
+
+[container]
+image = "python-ext-ci"
+engine = "podman"
+
+[extensions.python]
+source = "path"
+path = "devflow-ext-python"
+required = true

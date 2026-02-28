@@ -1,11 +1,30 @@
-# Devflow default Node.js container execution image
-FROM node:22-slim
+# Devflow multi-stage Node.js container execution blueprint
 
-# Install system dependencies if required by native extensions
+# ------------------------------------------------------------------------------
+# Stage 1: Base OS dependencies (Highly Stable Cache)
+# ------------------------------------------------------------------------------
+FROM debian:12.8-slim AS base
+LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Build Essentials)"
+
+# Install core system dependencies required by Node native extensions (node-gyp)
+# This layer rarely changes and remains heavily cached globally.
 RUN apt-get update && apt-get install -y \
+    curl \
+    git \
     build-essential \
     python3 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# ------------------------------------------------------------------------------
+# Stage 2: Toolchains & Devflow CI (Language Specific Cache)
+# ------------------------------------------------------------------------------
+FROM node:22.14.0-slim AS ci
+LABEL org.opencontainers.image.description="Devflow Node Toolchain"
+
+# Inherit OS base
+COPY --from=base / /
 
 WORKDIR /workspace

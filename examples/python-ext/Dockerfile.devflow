@@ -1,0 +1,5 @@
+FROM python:3.14.3-slim AS base
+
+RUN pip install pytest flake8 black --no-cache-dir
+
+WORKDIR /workspace

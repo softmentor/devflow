@@ -1,19 +1,22 @@
-# Devflow multi-stage Rust container execution blueprint
+# Multi-stack Tauri container blueprint
 
 # ------------------------------------------------------------------------------
 # Stage 1: Base OS dependencies (Highly Stable Cache)
 # ------------------------------------------------------------------------------
 FROM debian:12.8-slim AS base
-LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Build Essentials)"
+LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Tauri Deps)"
 
-# Install core system dependencies required by most compilation workflows.
-# This layer rarely changes and remains heavily cached globally.
+# Install Tauri prerequisites (webkit2gtk, libsoup, build-essential)
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     build-essential \
     pkg-config \
     libssl-dev \
+    libwebkit2gtk-4.1-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libsoup-3.0-dev \
+    libgtk-3-dev \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
@@ -23,12 +26,18 @@ WORKDIR /workspace
 # Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
 FROM rust:1.93.1-slim-bookworm AS ci
-LABEL org.opencontainers.image.description="Devflow Rust Toolchain (rustc, nextest, sccache)"
+LABEL org.opencontainers.image.description="Devflow Tauri Toolchain (Node + Rust)"
 
 # Inherit OS base
 COPY --from=base / /
 
-# Install cargo-nextest and sccache dynamically based on architecture for high speed CI
+# Install Node
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
+
+# Add Rust formatting tools
+RUN rustup component add rustfmt clippy
+
+# Install cargo-nextest and sccache dynamically based on architecture
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "aarch64" ]; then \
         NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-aarch64-unknown-linux-gnu.tar.gz" ; \
