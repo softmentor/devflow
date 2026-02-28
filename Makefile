@@ -28,11 +28,16 @@ test:
 package:
 	cargo run -p devflow-cli -- package:artifact
 
-check:
-	cargo run -p devflow-cli -- check:pr
+# Validates the current branch for a PR before merging to main
+check: verify
+	@echo "✓ PR verification passed. Branch is ready for merging."
 
+# Helper to automatically tag the v0.1.0 release cleanly (run this after merging to main)
 release:
-	cargo run -p devflow-cli -- release:candidate
+	@echo "Preparing to tag a new release..."
+	@git tag -a "v0.1.0" -m "chore: release v0.1.0"
+	@echo "Tag created. Push to trigger GitHub Actions release pipelines:"
+	@echo "  git push origin v0.1.0"
 
 ci-generate:
 	cargo run -p devflow-cli -- ci:generate
