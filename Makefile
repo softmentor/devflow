@@ -93,7 +93,7 @@ doc-myst:
 	fi
 
 docs: doc-myst
-	cargo doc --no-deps --workspace --open
+	cargo doc --no-deps --workspace
 
 # Typical development flow: fix formatting, lint, and run tests.
 dev: fmt lint test

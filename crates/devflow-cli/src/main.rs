@@ -14,13 +14,11 @@ mod init;
 
 /// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
-#[command(name = "dwf")]
 #[command(version)]
-#[command(about = "Devflow CLI - Modern developer workflow automation")]
-#[command(long_about = r#"
-Devflow is a high-performance developer workflow engine designed for consistency 
+#[command(about = concat!("Devflow CLI v", env!("CARGO_PKG_VERSION"), " - Modern developer workflow automation"))]
+#[command(long_about = concat!("Devflow v", env!("CARGO_PKG_VERSION"), "\n\n", "Devflow is a high-performance developer workflow engine designed for consistency 
 between local development and CI environments. It uses a container-first 
-approach to ensure that "it works on my machine" means "it works in CI".
+approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
 Common Commands:
   check:pr          Run the PR verification policy (fmt, lint, build, test)
@@ -31,7 +29,7 @@ Common Commands:
   build:debug       Perform a debug build
   test:unit         Run unit tests
   init              Initialize a new devflow.toml in the current directory
-"#)]
+"))]
 #[command(after_help = r#"
 Examples:
   dwf check pr              # Run all PR checks (shorthand)
@@ -74,6 +72,8 @@ fn main() -> Result<()> {
         Some(cmd) => cmd,
         None => {
             use clap::CommandFactory;
+            println!("dwf {}", env!("CARGO_PKG_VERSION"));
+            println!();
             Cli::command().print_help()?;
             println!(); // Add a newline after help
             return Ok(());
