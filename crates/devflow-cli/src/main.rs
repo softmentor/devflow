@@ -67,6 +67,15 @@ pub(crate) struct Cli {
     /// Context name for the status (e.g., "fmt", "lint").
     #[arg(long)]
     report: Option<String>,
+    /// Prune local caches.
+    #[arg(long, default_value_t = false)]
+    local: bool,
+    /// Prune GitHub Actions caches/runs (requires gh CLI).
+    #[arg(long, default_value_t = false)]
+    gh: bool,
+    /// Prune everything (local and GH).
+    #[arg(long, default_value_t = false)]
+    all: bool,
 }
 
 fn main() -> Result<()> {
@@ -277,11 +286,91 @@ fn execute_inner(
             println!("ci:plan profiles=[{}]", profiles);
             Ok(())
         }
+        PrimaryCommand::Prune => {
+            let selector = command.selector.as_deref().unwrap_or("cache");
+            match selector {
+                "cache" => {
+                    if cli.local || cli.all {
+                        println!("🧹 Pruning local caches...");
+                        let cache_dir = cfg.cache.as_ref().and_then(|c| c.root.as_ref())
+                            .map(Path::new)
+                            .unwrap_or(Path::new(".cargo-cache"));
+                        if cache_dir.exists() {
+                            fs::remove_dir_all(cache_dir).with_context(|| format!("failed to remove cache dir '{}'", cache_dir.display()))?;
+                        }
+                        let target_ci = Path::new("target/ci");
+                        if target_ci.exists() {
+                            fs::remove_dir_all(target_ci).with_context(|| "failed to remove target/ci")?;
+                        }
+                        println!("✨ Local cache pruned.");
+                    }
+                    if cli.gh || cli.all {
+                        println!("🧹 Pruning GitHub Actions caches...");
+                        run_gh_prune_cache()?;
+                        println!("✨ GH caches pruned.");
+                    }
+                }
+                "runs" => {
+                    if cli.gh || cli.all {
+                        println!("🧹 Pruning GitHub Actions workflow runs...");
+                        run_gh_prune_runs()?;
+                        println!("✨ GH runs pruned.");
+                    }
+                }
+                _ => return Err(anyhow!("unknown prune selector '{}'", selector)),
+            }
+            Ok(())
+        }
         _ => {
             registry.ensure_can_run(command)?;
             executor::run(cfg, registry, command)
         }
     }
+}
+
+fn run_gh_prune_cache() -> Result<()> {
+    // 1. Stale PR cleanup (>24h)
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json id,ref,lastAccessedAt | jq -r '.[] | select(.ref | startswith(\"refs/pull/\")) | select((.lastAccessedAt | sub(\"\\\\.[0-9]+Z$\"; \"Z\") | fromdateiso8601) < (now - 86400)) | .id' | xargs -I {} gh cache delete {}")
+        .status()?;
+
+    // 2. Capacity-based pruning (>8GB)
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json sizeInBytes --jq '[.[].sizeInBytes] | add // 0'")
+        .output()?;
+    let size_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let total_size: u64 = size_str.parse().unwrap_or(0);
+    let threshold: u64 = 8 * 1024 * 1024 * 1024; // 8GB
+
+    if total_size > threshold {
+        println!("⚠️ Cache limit reached ({} MB). Pruning refs...", total_size / 1024 / 1024);
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("gh cache list --limit 100 --json ref --jq '.[].ref' | sort | uniq | xargs -I {ref} sh -c 'gh cache list --ref {ref} --json id,key | jq -r \".[] | select(.key | contains(\\\"cargo-\\\")) | .id\" | tail -n +2 | xargs -I {} gh cache delete {}'")
+            .status()?;
+    }
+    Ok(())
+}
+
+fn run_gh_prune_runs() -> Result<()> {
+    // 1. Failed/Canceled
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --status failure --limit 1000 --json databaseId --jq '.[].databaseId' | xargs -I {} gh run delete {}")
+        .status()?;
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --status cancelled --limit 1000 --json databaseId --jq '.[].databaseId' | xargs -I {} gh run delete {}")
+        .status()?;
+
+    // 2. Keep latest 100
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --limit 1000 --json databaseId --jq '.[].databaseId' | tail -n +101 | xargs -I {} gh run delete {}")
+        .status()?;
+    Ok(())
 }
 
 fn write_ci_workflow(path: &str, content: &str) -> Result<()> {

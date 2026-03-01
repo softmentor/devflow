@@ -113,3 +113,17 @@ verify-examples:
 	@echo "--- [python-ext] ---"
 	cd examples/python-ext && cargo run -p devflow-cli -- check:pr || echo "⚠️ python-ext execution failed as expected (missing host tools), protocol verified."
 	@echo "✅ Examples verification complete."
+
+# Deep clean and environment reset
+teardown:
+	@echo "🧹 Tearing down Devflow environment..."
+	rm -rf .cargo-cache target/ci ci-image.tar
+	@echo "🐳 Pruning container state..."
+	@if command -v podman >/dev/null 2>&1; then \
+		podman system prune -f; \
+		podman volume prune -f; \
+	elif command -v docker >/dev/null 2>&1; then \
+		docker system prune -f; \
+		docker volume prune -f; \
+	fi
+	@echo "✨ Teardown complete."
