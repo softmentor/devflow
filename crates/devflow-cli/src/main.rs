@@ -304,9 +304,13 @@ fn execute_inner(
                         }
                         println!("✨ Local cache pruned.");
                     }
-                    if cli.gh || cli.all {
-                        println!("🧹 Pruning GitHub Actions caches...");
-                        run_gh_prune_cache()?;
+                    if (cli.gh || cli.all) && cli.force {
+                        println!("🔥 Force-pruning ALL GitHub Actions caches (Scorched Earth)...");
+                        run_gh_prune_cache(true)?;
+                        println!("✨ All GH caches purged.");
+                    } else if cli.gh || cli.all {
+                        println!("🧹 Pruning GitHub Actions caches (Standard Safety)...");
+                        run_gh_prune_cache(false)?;
                         println!("✨ GH caches pruned.");
                     }
                 }
@@ -328,7 +332,16 @@ fn execute_inner(
     }
 }
 
-fn run_gh_prune_cache() -> Result<()> {
+fn run_gh_prune_cache(force: bool) -> Result<()> {
+    if force {
+        // Scorched Earth: Delete everything
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("gh cache list --limit 100 --json id --jq '.[].id' | xargs -I {} gh cache delete {}")
+            .status()?;
+        return Ok(());
+    }
+
     // 1. Stale PR cleanup (>24h)
     let _ = std::process::Command::new("sh")
         .arg("-c")
