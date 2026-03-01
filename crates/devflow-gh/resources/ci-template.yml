@@ -57,7 +57,7 @@ jobs:
 
       - name: Trivy Vulnerability Scan
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.29.0
         with:
           image-ref: devflow-ci:latest
           severity: CRITICAL,HIGH

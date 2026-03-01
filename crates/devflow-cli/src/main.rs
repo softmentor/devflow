@@ -35,16 +35,21 @@ approach to ensure that \"it works on my machine\" means \"it works in CI\".
 Common Commands:
   init              Initialize a new devflow.toml in the current directory
   check:pr          Run the PR verification policy (fmt, lint, build, test)
+  check:security    Run local vulnerability scan (requires Trivy)
   fmt:fix           Fix code formatting
   fmt:check         Check code formatting
   lint:static       Run static analysis (clippy, eslint, etc.)
   build:debug       Perform a debug build
   test:unit         Run unit tests
   ci:generate       Generate or update the GitHub Actions workflow
+  ci:check          Check if the local workflow is in sync with the config
+  ci:plan           Show the current CI execution plan and profiles
+  prune:cache       Prune local and remote caches
+  prune:runs        Prune GitHub Actions workflow runs
 "
 )]
 #[command(
-    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf check security\x1b[0m        \x1b[2m# Run local vulnerability scan\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
+    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf check security\x1b[0m        \x1b[2m# Run local vulnerability scan\x1b[0m\n  \x1b[36mdwf prune:cache --all\x1b[0m     \x1b[2m# Prune local and GH caches\x1b[0m\n  \x1b[36mdwf prune:runs --gh\x1b[0m       \x1b[2m# Prune remote workflow runs\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
 )]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
