@@ -82,10 +82,27 @@ impl Extension for RustExtension {
 
     fn cache_mounts(&self) -> Vec<String> {
         vec![
-            "rust/cargo/registry:/usr/local/cargo/registry".to_string(),
-            "rust/cargo/git:/usr/local/cargo/git".to_string(),
-            "rust/sccache:/root/.cache/sccache".to_string(),
+            "rust/cargo:/workspace/.cargo-cache".to_string(),
+            "rust/target:/workspace/target".to_string(),
         ]
+    }
+
+    fn env_vars(&self) -> std::collections::HashMap<String, String> {
+        let mut env = std::collections::HashMap::new();
+        env.insert(
+            "CARGO_HOME".to_string(),
+            "/workspace/.cargo-cache".to_string(),
+        );
+        env.insert(
+            "CARGO_TARGET_DIR".to_string(),
+            "/workspace/target".to_string(),
+        );
+        env.insert(
+            "SCCACHE_DIR".to_string(),
+            "/workspace/.cargo-cache/sccache".to_string(),
+        );
+        env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+        env
     }
 
     fn fingerprint_inputs(&self) -> Vec<String> {
@@ -102,6 +119,7 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
     ExecutionAction {
         program: program.to_string(),
         args: args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
     }
 }
 

@@ -1,11 +1,6 @@
 name: ci
 
-on:
-  pull_request:
-  push:
-    branches:
-      - main
-  workflow_call:
+on: [pull_request, push]
 
 env:
   DWF_CACHE_ROOT: .cache/devflow
@@ -13,49 +8,119 @@ env:
 jobs:
   prep:
     runs-on: ubuntu-latest
+    outputs:
+      image_available: ${{ steps.check.outputs.available }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check for Dockerfile.devflow
+        id: check
+        run: |
+          if [ -f Dockerfile.devflow ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cache CI Image Tar
+        if: steps.check.outputs.available == 'true'
+        id: image_cache
+        uses: actions/cache@v4
+        with:
+          path: ci-image.tar
+          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+
+      - name: Build CI Image
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        run: |
+          docker build -f Dockerfile.devflow -t devflow-ci .
+          docker save -o ci-image.tar devflow-ci
 
   build:
     runs-on: ubuntu-latest
     needs: [prep]
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Cache DWF Cache Root
-        uses: actions/cache@v4
+      - name: Restore DWF Cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.DWF_CACHE_ROOT }}
-          key: dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          key: dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
           restore-keys: |
+            dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-
             dwf-cache-${{ runner.os }}-
 
-      - name: Bootstrap dwf
-        run: cargo install --path crates/devflow-cli --debug
-        
-      - name: Warm Cache
-        run: dwf build:debug
+      - name: Restore CI Image Tar
+        if: needs.prep.outputs.image_available == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ci-image.tar
+          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
 
-  verify:
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Restore DWF Cache Root
-        uses: actions/cache@v4
+      - name: Load CI Image
+        if: needs.prep.outputs.image_available == 'true'
+        run: docker load -i ci-image.tar
+
+      - name: Bootstrap Devflow
+        run: |
+          cargo install --path crates/devflow-cli --debug
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Warm Cache
+        run: |
+          mkdir -p ${{ env.DWF_CACHE_ROOT }}
+          dwf setup:deps
+          dwf build:debug
+      - name: Fix Cache Permissions
+        if: always()
+        run: sudo chown -R $USER:$USER ${{ env.DWF_CACHE_ROOT }} || true
+
+      - name: Save DWF Cache
+        uses: actions/cache/save@v4
+        if: always()
         with:
           path: ${{ env.DWF_CACHE_ROOT }}
-          key: dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          
-      - name: Bootstrap dwf
-        run: cargo install --path crates/devflow-cli --debug
-        
-      - name: Sequential Verify (Grouped to avoid container spin-up overhead)
+          key: dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+
+  verify:
+    name: "Verify"
+    runs-on: ubuntu-latest
+    needs: [prep, build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore DWF Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.DWF_CACHE_ROOT }}
+          key: dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            dwf-cache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-
+            dwf-cache-${{ runner.os }}-
+
+      - name: Restore CI Image Tar
+        if: needs.prep.outputs.image_available == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ci-image.tar
+          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+
+      - name: Load CI Image
+        if: needs.prep.outputs.image_available == 'true'
+        run: docker load -i ci-image.tar
+
+      - name: Bootstrap Devflow
+        run: |
+          cargo install --path crates/devflow-cli --debug
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Run Sequential Checks
         run: |
           dwf fmt:check
           dwf lint:static
+          dwf build:debug
           dwf test:unit
           dwf test:integration
 
+      - name: Fix Cache Permissions
+        if: always()
+        run: sudo chown -R $USER:$USER ${{ env.DWF_CACHE_ROOT }} || true
 # project: devflow

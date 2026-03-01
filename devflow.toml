@@ -3,7 +3,11 @@ name = "devflow"
 stack = ["rust"]
 
 [runtime]
-profile = "auto"
+profile = "container"
+
+[container]
+image = "devflow-ci"
+engine = "docker"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
