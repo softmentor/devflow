@@ -164,7 +164,7 @@ mod tests {
 
     fn test_cli(dir: &Path) -> Cli {
         Cli {
-            command: "init".to_string(),
+            command: Some("init".to_string()),
             selector: None,
             config: dir.join("devflow.toml").to_str().unwrap().to_string(),
             stdout: false,
