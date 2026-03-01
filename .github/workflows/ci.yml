@@ -55,13 +55,32 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-      - name: Trivy Vulnerability Scan
+      - name: Generate Trivy Vulnerability Report (JSON)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           image-ref: devflow-ci:latest
-          severity: CRITICAL,HIGH
+          format: json
+          output: trivy-report.json
+          exit-code: 0
+
+      - name: Upload Vulnerability Scan Results
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+          retention-days: 30
+
+      - name: Fail build on High/CRITICAL Vulnerabilities
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/trivy-action@0.34.1
+        with:
+          image-ref: devflow-ci:latest
+          format: table
+          severity: HIGH,CRITICAL
           exit-code: 1
+          skip-setup-trivy: true
 
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'

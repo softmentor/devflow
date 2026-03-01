@@ -32,20 +32,29 @@ use styles as s;
 between local development and CI environments. It uses a container-first 
 approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
-Common Commands:
-  init              Initialize a new devflow.toml in the current directory
-  check:pr          Run the PR verification policy (fmt, lint, build, test)
-  check:security    Run local vulnerability scan (requires Trivy)
-  fmt:fix           Fix code formatting
-  fmt:check         Check code formatting
-  lint:static       Run static analysis (clippy, eslint, etc.)
-  build:debug       Perform a debug build
-  test:unit         Run unit tests
-  ci:generate       Generate or update the GitHub Actions workflow
-  ci:check          Check if the local workflow is in sync with the config
-  ci:plan           Show the current CI execution plan and profiles
-  prune:cache       Prune local and remote caches
-  prune:runs        Prune GitHub Actions workflow runs
+\x1b[1;32mCommand Glossary:\x1b[0m
+  \x1b[1mInitialization\x1b[0m
+    \x1b[36minit\x1b[0m                       Bootstrap a project (detects stack)
+    \x1b[36msetup:[doctor|deps|toolchain]\x1b[0m Setup environment & verify tools
+
+  \x1b[1mVerification & Security\x1b[0m
+    \x1b[36mcheck:[pr|security]\x1b[0m        Run PR policy or local security scan
+
+  \x1b[1mCore Development\x1b[0m
+    \x1b[36mfmt:[check|fix]\x1b[0m            Check or apply code formatting
+    \x1b[36mlint:static\x1b[0m                Run static analysis (clippy, eslint, etc.)
+    \x1b[36mbuild:[debug|release]\x1b[0m      Perform incremental or optimized builds
+    \x1b[36mtest:[unit|integration|smoke]\x1b[0m Run specific test suites
+
+  \x1b[1mCI & Infrastructure\x1b[0m
+    \x1b[36mci:[generate|check|plan]\x1b[0m   Manage .github/workflows/ci.yml
+
+  \x1b[1mMaintenance\x1b[0m
+    \x1b[36mprune:[cache|runs]\x1b[0m         Cleanup local/remote state (use --local, --gh)
+
+  \x1b[1mRelease\x1b[0m
+    \x1b[36mrelease:candidate\x1b[0m          Prepare or verify a release candidate
+    \x1b[36mpackage:artifact\x1b[0m           Package the project for distribution
 "
 )]
 #[command(
