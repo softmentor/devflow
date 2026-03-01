@@ -27,57 +27,7 @@ use styles as s;
     help_template = "{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}"
 )]
 #[command(about = "Modern developer workflow automation")]
-#[command(
-    long_about = "Devflow is a high-performance developer workflow engine designed for consistency 
-between local development and CI environments. It uses a container-first 
-approach to ensure that \"it works on my machine\" means \"it works in CI\".
-
-Command Glossary:
-  Initialization & Environment
-    init                       Bootstrap a project (detects stack automatically)
-    setup:doctor               Verify host toolchains and environment
-    setup:deps                 Fetch and pre-cache project dependencies
-    setup:toolchain            Install/update required language toolchains
-
-  Verification & Security
-    check:pr                   Run the standard PR verification (fmt, lint, build, test)
-    check:security             Run local vulnerability scan on CI images (requires Trivy)
-
-  Development Workflow
-    fmt:check                  Check if code matches project formatting standards
-    fmt:fix                    Automatically apply formatting fixes
-    lint:static                Run clippy, eslint, or other static analyzers
-    build:debug                Perform an incremental debug build
-    build:release              Perform an optimized production build
-    test:unit                  Run project unit tests
-    test:integration           Run integration/infrastructure tests
-    test:smoke                 Run high-level end-to-end smoke tests
-
-  CI Infrastructure
-    ci:generate                Sync .github/workflows/ci.yml with devflow.toml
-    ci:check                   Verify if local CI workflow matches current config
-    ci:plan                    Preview the CI execution strategy and profiles
-
-  Maintenance
-    prune:cache                Cleanup local or GHA caches (use --local, --gh, --all)
-    prune:runs                 Clean up stale GHA workflow runs (use --gh)
-
-  Release
-    package:artifact           Build and bundle project distribution artifacts
-    release:candidate          Tag and prepare a new release candidate
-"
-)]
-#[command(after_help = "Examples:
-  dwf init                  # Bootstrap a new project
-  dwf check pr              # Run all PR checks (shorthand for check:pr)
-  dwf check security        # Run local vulnerability scan
-  dwf prune:cache --all     # Prune local and GH caches
-  dwf prune:runs --gh       # Prune remote workflow runs
-  dwf fmt fix               # Fix formatting across the project
-  dwf test unit             # Run unit tests only
-  dwf ci:generate           # Update .github/workflows/ci.yml
-
-GitHub Repository: https://github.com/softmentor/devflow")]
+#[command(long_about = "Devflow is a high-performance developer workflow engine.")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,
