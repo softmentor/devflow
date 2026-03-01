@@ -38,11 +38,9 @@ jobs:
 
       - name: Cache CI Image Tar
         if: steps.check.outputs.available == 'true'
-        id: image_cache
-        uses: actions/cache@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Build CI Image (Buildx)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -71,6 +69,12 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
 
+      - name: Ensure Cache Paths Exist
+        if: steps.check.outputs.available == 'true'
+        run: |
+          touch ci-image.tar
+          mkdir -p /tmp/.buildx-cache
+
   # ---------------------------------------------------------------------------
   # Phase 2 — Build: warm the cargo/sccache cache inside the CI container
   # Runs inside the CI container for shared filesystem and cache parity.
@@ -87,7 +91,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Load CI Image
         if: needs.prep.outputs.image_available == 'true'
@@ -101,8 +105,8 @@ jobs:
             .cargo-cache/git
             .cargo-cache/sccache
             target/ci
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-v3-${{ runner.os }}-
 
       - name: Bootstrap & Warm Cache
         run: |
@@ -118,7 +122,9 @@ jobs:
 
       - name: Fix Cache Permissions
         if: always()
-        run: sudo chmod -R a+rw .cargo-cache target/ci || true
+        run: |
+          sudo chown -R $USER:$USER .cargo-cache target/ci || true
+          sudo chmod -R a+rw .cargo-cache target/ci || true
 
   # ---------------------------------------------------------------------------
   # Phase 3 — Verify: sequential checks inside the same container instance
@@ -136,7 +142,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Load CI Image
         if: needs.prep.outputs.image_available == 'true'
@@ -150,8 +156,8 @@ jobs:
             .cargo-cache/git
             .cargo-cache/sccache
             target/ci
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-v3-${{ runner.os }}-
 
       - name: Bootstrap Devflow
         run: |
@@ -186,5 +192,7 @@ jobs:
 
       - name: Fix Cache Permissions
         if: always()
-        run: sudo chmod -R a+rw .cargo-cache target/ci || true
+        run: |
+          sudo chown -R $USER:$USER .cargo-cache target/ci || true
+          sudo chmod -R a+rw .cargo-cache target/ci || true
 # project: {{PROJECT_NAME}}
