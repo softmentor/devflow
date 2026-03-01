@@ -83,7 +83,7 @@ impl Extension for RustExtension {
     fn cache_mounts(&self) -> Vec<String> {
         vec![
             "rust/cargo:/workspace/.cargo-cache".to_string(),
-            "rust/target:/workspace/target".to_string(),
+            "rust/target:/workspace/target/ci".to_string(),
         ]
     }
 
@@ -95,7 +95,7 @@ impl Extension for RustExtension {
         );
         env.insert(
             "CARGO_TARGET_DIR".to_string(),
-            "/workspace/target".to_string(),
+            "/workspace/target/ci".to_string(),
         );
         env.insert(
             "SCCACHE_DIR".to_string(),

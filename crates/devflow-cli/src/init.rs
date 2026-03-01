@@ -174,6 +174,7 @@ mod tests {
                 .unwrap()
                 .to_string(),
             force: false,
+            report: None,
         }
     }
 

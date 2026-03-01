@@ -19,20 +19,30 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# ------------------------------------------------------------------------------
 # Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
-FROM rust:1.93.1-slim-bookworm AS ci
+FROM rust:1.85.0-slim-bookworm AS ci
 LABEL org.opencontainers.image.description="Devflow Rust Toolchain (rustc, nextest, sccache)"
 
 # Inherit OS base
 COPY --from=base / /
 
-# Install cargo-nextest (pinned version) for high speed testing (leveraged natively by devflow-ext-rust)
-RUN curl -LsSf https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-x86_64-unknown-linux-gnu.tar.gz | tar zxf - -C /usr/local/bin
+# Install rustfmt and clippy
+RUN rustup component add rustfmt clippy
 
-# Install sccache for compilation caching
-RUN curl -LsSf https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-x86_64-unknown-linux-musl.tar.gz | tar zxf - --strip-components=1 -C /usr/local/bin sccache-v0.8.1-x86_64-unknown-linux-musl/sccache
+# Install cargo-nextest and sccache (pinned versions) with dynamic architecture detection
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        NEXTEST_ARCH="x86_64-unknown-linux-gnu"; \
+        SCCACHE_ARCH="x86_64-unknown-linux-musl"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        NEXTEST_ARCH="aarch64-unknown-linux-gnu"; \
+        SCCACHE_ARCH="aarch64-unknown-linux-musl"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    curl -LsSf "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-${NEXTEST_ARCH}.tar.gz" | tar zxf - -C /usr/local/bin && \
+    curl -LsSf "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-${SCCACHE_ARCH}.tar.gz" | tar zxf - --strip-components=1 -C /usr/local/bin "sccache-v0.8.1-${SCCACHE_ARCH}/sccache"
 
 ENV RUSTC_WRAPPER=sccache
 

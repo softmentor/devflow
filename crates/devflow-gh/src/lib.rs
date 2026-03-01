@@ -14,12 +14,22 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
 
     let template = include_str!("../resources/ci-template.yml");
 
-    // Join commands with && for docker run sh -c execution
-    let commands: Vec<String> = pr.iter().map(|cmd| format!("dwf {}", cmd)).collect();
-    let commands_str = commands.join(" && ");
+    // Map commands to background execution and capture PIDs.
+    // Then wait for each PID and accumulate exit codes.
+    let mut script = String::new();
+    script.push_str("pids=(); ");
+
+    for cmd in pr {
+        let context = cmd.replace(':', "-");
+        script.push_str(&format!("dwf --report {} {} & pids+=($!); ", context, cmd));
+    }
+
+    script.push_str(
+        "exit_code=0; for pid in ${pids[@]}; do wait $pid || exit_code=$?; done; exit $exit_code",
+    );
 
     let rendered = template
-        .replace("{{COMMANDS}}", &commands_str)
+        .replace("{{COMMANDS}}", &script)
         .replace("{{PROJECT_NAME}}", &cfg.project.name);
 
     Ok(rendered)
@@ -48,10 +58,14 @@ pub fn check_workflow(cfg: &DevflowConfig, workflow: &str) -> Result<()> {
         issues.push("missing required 'verify' job".to_string());
     }
 
-    for cmd in pr {
-        if !workflow.contains(&format!("dwf {}", cmd)) {
-            issues.push(format!("missing command invocation 'dwf {}'", cmd));
+    for _cmd in pr {
+        if !workflow.contains("dwf --report") {
+            issues.push("missing command invocation 'dwf --report'".to_string());
         }
+    }
+
+    if !workflow.contains(" wait") {
+        issues.push("missing 'wait' command for parallel checks".to_string());
     }
 
     if issues.is_empty() {
@@ -91,9 +105,10 @@ mod tests {
         assert!(out.contains("  prep:"));
         assert!(out.contains("  build:"));
         assert!(out.contains("Verify"));
-        assert!(out.contains("dwf fmt:check"));
-        assert!(out.contains("dwf lint:static"));
-        assert!(out.contains("dwf test:unit"));
+        assert!(out.contains("dwf --report fmt-check fmt:check &"));
+        assert!(out.contains("dwf --report lint-static lint:static &"));
+        assert!(out.contains("dwf --report test-unit test:unit &"));
+        assert!(out.contains("wait"));
     }
 
     #[test]

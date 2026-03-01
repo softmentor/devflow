@@ -71,6 +71,12 @@ impl Extension for NodeExtension {
         vec!["node/npm:/root/.npm".to_string()]
     }
 
+    fn env_vars(&self) -> std::collections::HashMap<String, String> {
+        let mut env = std::collections::HashMap::new();
+        env.insert("NPM_CONFIG_CACHE".to_string(), "/root/.npm".to_string());
+        env
+    }
+
     fn fingerprint_inputs(&self) -> Vec<String> {
         vec![
             "package-lock.json".to_string(),

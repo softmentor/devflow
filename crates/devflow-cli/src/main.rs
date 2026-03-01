@@ -13,6 +13,9 @@ mod executor;
 mod init;
 mod styles;
 
+use serde_json::json;
+
+#[allow(unused_imports)]
 use styles as s;
 
 /// The command-line interface for Devflow.
@@ -20,9 +23,12 @@ use styles as s;
 #[command(name = "dwf")]
 #[command(version)]
 #[command(styles = s::get_clap_styles())]
-#[command(help_template = "\x1b[1;34mDevflow CLI - High Performance Workflow Engine\x1b[0m\n\n{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}")]
+#[command(
+    help_template = "{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}"
+)]
 #[command(about = "Modern developer workflow automation")]
-#[command(long_about = "Devflow is a high-performance developer workflow engine designed for consistency 
+#[command(
+    long_about = "Devflow is a high-performance developer workflow engine designed for consistency 
 between local development and CI environments. It uses a container-first 
 approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
@@ -35,8 +41,11 @@ Common Commands:
   build:debug       Perform a debug build
   test:unit         Run unit tests
   ci:generate       Generate or update the GitHub Actions workflow
-")]
-#[command(after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow")]
+"
+)]
+#[command(
+    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
+)]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,
@@ -54,6 +63,10 @@ pub(crate) struct Cli {
     /// Overwrite generated files if they already exist.
     #[arg(long, default_value_t = false)]
     force: bool,
+    /// Report execution status to GitHub (requires GITHUB_TOKEN).
+    /// Context name for the status (e.g., "fmt", "lint").
+    #[arg(long)]
+    report: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -103,8 +116,106 @@ fn main() -> Result<()> {
     execute(&cli, &cfg, &registry, &command)
 }
 
+/// Reports a GitHub status update.
+fn report_status(
+    context: &str,
+    state: &str,
+    description: &str,
+    target_url: Option<&str>,
+) -> Result<()> {
+    let token = match std::env::var("GITHUB_TOKEN") {
+        Ok(t) => t,
+        Err(_) => {
+            debug!("GITHUB_TOKEN not set, skipping status reporting");
+            return Ok(());
+        }
+    };
+
+    let repo = match std::env::var("GITHUB_REPOSITORY") {
+        Ok(r) => r,
+        Err(_) => {
+            debug!("GITHUB_REPOSITORY not set, skipping status reporting");
+            return Ok(());
+        }
+    };
+
+    let sha = std::env::var("GITHUB_HEAD_SHA")
+        .or_else(|_| std::env::var("GITHUB_SHA"))
+        .context("niether GITHUB_HEAD_SHA nor GITHUB_SHA is set")?;
+
+    let url = format!("https://api.github.com/repos/{}/statuses/{}", repo, sha);
+
+    let body = json!({
+        "state": state,
+        "context": context,
+        "description": description,
+        "target_url": target_url,
+    });
+
+    let resp = ureq::post(&url)
+        .set("Authorization", &format!("Bearer {}", token))
+        .set("Accept", "application/vnd.github+json")
+        .set("X-GitHub-Api-Version", "2022-11-28")
+        .send_json(body);
+
+    match resp {
+        Ok(_) => {
+            debug!(
+                "successfully reported status '{}' for context '{}'",
+                state, context
+            );
+            Ok(())
+        }
+        Err(e) => {
+            // We don't want to fail the whole command just because reporting failed,
+            // but we should log it.
+            tracing::warn!("failed to report status to GitHub: {}", e);
+            Ok(())
+        }
+    }
+}
+
+fn get_gha_target_url() -> Option<String> {
+    let repo = std::env::var("GITHUB_REPOSITORY").ok()?;
+    let run_id = std::env::var("GITHUB_RUN_ID").ok()?;
+    Some(format!(
+        "https://github.com/{}/actions/runs/{}",
+        repo, run_id
+    ))
+}
+
 /// Executes a validated Devflow command.
 fn execute(
+    cli: &Cli,
+    cfg: &DevflowConfig,
+    registry: &ExtensionRegistry,
+    command: &CommandRef,
+) -> Result<()> {
+    if let Some(context) = &cli.report {
+        let target_url = get_gha_target_url();
+        report_status(
+            context,
+            "pending",
+            &format!("Running {}...", context),
+            target_url.as_deref(),
+        )?;
+
+        let result = execute_inner(cli, cfg, registry, command);
+
+        let (state, desc) = match &result {
+            Ok(_) => ("success", format!("{} passed", context)),
+            Err(_) => ("failure", format!("{} failed", context)),
+        };
+
+        report_status(context, state, &desc, target_url.as_deref())?;
+        result
+    } else {
+        execute_inner(cli, cfg, registry, command)
+    }
+}
+
+/// Internal execution logic.
+fn execute_inner(
     cli: &Cli,
     cfg: &DevflowConfig,
     registry: &ExtensionRegistry,
@@ -208,6 +319,7 @@ mod tests {
             stdout: true,
             ci_output: ci_output.to_string(),
             force: false,
+            report: None,
         }
     }
 

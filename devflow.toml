@@ -7,7 +7,7 @@ profile = "host"
 
 [container]
 image = "devflow-ci"
-engine = "docker"
+engine = "auto"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]

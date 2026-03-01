@@ -167,6 +167,11 @@ jobs:
             -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
             -e RUSTC_WRAPPER=sccache \
             -e IS_CONTAINER=true \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e GITHUB_REPOSITORY=${{ github.repository }} \
+            -e GITHUB_SHA=${{ github.sha }} \
+            -e GITHUB_HEAD_SHA=${{ github.event.pull_request.head.sha }} \
+            -e GITHUB_RUN_ID=${{ github.run_id }} \
             -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             devflow-ci:latest \
             sh -c "{{COMMANDS}}"
