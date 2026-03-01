@@ -1,4 +1,5 @@
 # Devflow multi-stage Rust container execution blueprint
+# 2025 Best Practices: Non-root, Tini, BuildKit Cache Mounts
 
 # ------------------------------------------------------------------------------
 # Stage 1: Base OS dependencies (Highly Stable Cache)
@@ -6,32 +7,51 @@
 FROM debian:12.8-slim AS base
 LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Build Essentials)"
 
-# Install core system dependencies required by most compilation workflows.
-# This layer rarely changes and remains heavily cached globally.
-RUN apt-get update && apt-get install -y \
+# Use BuildKit cache mounts for apt to speed up rebuilds
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
     curl \
     git \
     build-essential \
     pkg-config \
     libssl-dev \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    tini \
+    --no-install-recommends
 
 WORKDIR /workspace
 
-# Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
 FROM rust:1.85.0-slim-bookworm AS ci
 LABEL org.opencontainers.image.description="Devflow Rust Toolchain (rustc, nextest, sccache)"
 
-# Inherit OS base
-COPY --from=base / /
+# Install minimal build deps and curl in the CI stage
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    --no-install-recommends
 
-# Install rustfmt and clippy
-RUN rustup component add rustfmt clippy
+# Inherit tini from base
+COPY --from=base /usr/bin/tini /usr/bin/tini
 
-# Install cargo-nextest and sccache (pinned versions) with dynamic architecture detection
-RUN ARCH=$(uname -m) && \
+# Setup non-root user for security (UID 1001)
+RUN groupadd -g 1001 dwfgroup && \
+    useradd -u 1001 -g dwfgroup -m -s /bin/bash dwfuser
+
+# Use BuildKit cache mounts for rustup components
+RUN --mount=type=cache,target=/usr/local/rustup/downloads \
+    rustup component add rustfmt clippy
+
+# Install cargo-nextest and sccache with dynamic architecture detection
+# Use cache mount for downloads
+RUN --mount=type=cache,target=/root/.cache \
+    ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
         NEXTEST_ARCH="x86_64-unknown-linux-gnu"; \
         SCCACHE_ARCH="x86_64-unknown-linux-musl"; \
@@ -45,5 +65,10 @@ RUN ARCH=$(uname -m) && \
     curl -LsSf "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-${SCCACHE_ARCH}.tar.gz" | tar zxf - --strip-components=1 -C /usr/local/bin "sccache-v0.8.1-${SCCACHE_ARCH}/sccache"
 
 ENV RUSTC_WRAPPER=sccache
-
 WORKDIR /workspace
+
+# Set ownership and switch to non-root user
+RUN chown -R dwfuser:dwfgroup /workspace
+USER dwfuser
+
+ENTRYPOINT ["/usr/bin/tini", "--"]

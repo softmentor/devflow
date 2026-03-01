@@ -1,4 +1,5 @@
 # Multi-stack Tauri container blueprint
+# 2025 Best Practices: Non-root, Tini, BuildKit Cache Mounts
 
 # ------------------------------------------------------------------------------
 # Stage 1: Base OS dependencies (Highly Stable Cache)
@@ -6,8 +7,10 @@
 FROM debian:12.8-slim AS base
 LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Tauri Deps)"
 
-# Install Tauri prerequisites (webkit2gtk, libsoup, build-essential)
-RUN apt-get update && apt-get install -y \
+# Install Tauri prerequisites and tini with cache mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
     curl \
     git \
     build-essential \
@@ -17,40 +20,64 @@ RUN apt-get update && apt-get install -y \
     libjavascriptcoregtk-4.1-dev \
     libsoup-3.0-dev \
     libgtk-3-dev \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    tini \
+    --no-install-recommends
 
 WORKDIR /workspace
 
 # ------------------------------------------------------------------------------
 # Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
-FROM rust:1.93.1-slim-bookworm AS ci
+FROM rust:1.85.0-slim-bookworm AS ci
 LABEL org.opencontainers.image.description="Devflow Tauri Toolchain (Node + Rust)"
 
-# Inherit OS base
-COPY --from=base / /
+# Install minimal build deps and curl in the CI stage
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    --no-install-recommends
 
-# Install Node
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
+# Inherit tini and Tauri deps from base
+COPY --from=base /usr/bin/tini /usr/bin/tini
 
-# Add Rust formatting tools
-RUN rustup component add rustfmt clippy
+# Setup non-root user (UID 1001)
+RUN groupadd -g 1001 dwfgroup && \
+    useradd -u 1001 -g dwfgroup -m -s /bin/bash dwfuser
+
+# Install Node with cache mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
+
+# Add Rust formatting tools with cache mounts
+RUN --mount=type=cache,target=/usr/local/rustup/downloads \
+    rustup component add rustfmt clippy
 
 # Install cargo-nextest and sccache dynamically based on architecture
-RUN ARCH=$(uname -m) && \
+RUN --mount=type=cache,target=/root/.cache \
+    ARCH=$(uname -m) && \
     if [ "$ARCH" = "aarch64" ]; then \
-        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-aarch64-unknown-linux-gnu.tar.gz" ; \
-        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-aarch64-unknown-linux-musl.tar.gz" ; \
-        SCCACHE_FOLDER="sccache-v0.8.1-aarch64-unknown-linux-musl" ; \
+        NEXTEST_ARCH="aarch64-unknown-linux-gnu"; \
+        SCCACHE_ARCH="aarch64-unknown-linux-musl"; \
+    elif [ "$ARCH" = "x86_64" ]; then \
+        NEXTEST_ARCH="x86_64-unknown-linux-gnu"; \
+        SCCACHE_ARCH="x86_64-unknown-linux-musl"; \
     else \
-        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-x86_64-unknown-linux-gnu.tar.gz" ; \
-        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-x86_64-unknown-linux-musl.tar.gz" ; \
-        SCCACHE_FOLDER="sccache-v0.8.1-x86_64-unknown-linux-musl" ; \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
     fi && \
-    curl -LsSf $NEXTEST_URL | tar zxf - -C /usr/local/bin && \
-    curl -LsSf $SCCACHE_URL | tar zxf - --strip-components=1 -C /usr/local/bin $SCCACHE_FOLDER/sccache
+    curl -LsSf "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-${NEXTEST_ARCH}.tar.gz" | tar zxf - -C /usr/local/bin && \
+    curl -LsSf "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-${SCCACHE_ARCH}.tar.gz" | tar zxf - --strip-components=1 -C /usr/local/bin "sccache-v0.8.1-${SCCACHE_ARCH}/sccache"
 
 ENV RUSTC_WRAPPER=sccache
-
 WORKDIR /workspace
+
+# Set ownership and switch to non-root user
+RUN chown -R dwfuser:dwfgroup /workspace
+USER dwfuser
+
+ENTRYPOINT ["/usr/bin/tini", "--"]

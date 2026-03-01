@@ -14,5 +14,5 @@ source = "builtin"
 required = true
 
 [container]
-image = "rust-lib-ci"
+image = "devflow-ci-rust"
 engine = "auto"

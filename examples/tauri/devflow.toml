@@ -18,5 +18,5 @@ source = "builtin"
 required = true
 
 [container]
-image = "tauri-ci"
+image = "devflow-ci-tauri"
 engine = "auto"

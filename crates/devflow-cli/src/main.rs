@@ -70,8 +70,18 @@ pub(crate) struct Cli {
 }
 
 fn main() -> Result<()> {
+    let format = fmt::format()
+        .with_target(false)
+        .with_level(true)
+        .with_timer(fmt::time::uptime())
+        .compact();
+
     tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(
+            fmt::layer()
+                .event_format(format)
+                .with_writer(std::io::stderr),
+        )
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 

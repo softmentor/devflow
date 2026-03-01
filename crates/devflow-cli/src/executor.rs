@@ -25,7 +25,7 @@ const CONTAINER_WORKSPACE: &str = "/workspace";
 const CONTAINER_DWF_BIN: &str = "/usr/local/bin/dwf";
 
 /// Runs a Devflow command by dispatching it to applicable stacks.
-#[instrument(skip(cfg, registry))]
+#[instrument(skip(cfg, registry), fields(command = %command))]
 pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandRef) -> Result<()> {
     let mut attempted = false;
 
@@ -74,7 +74,7 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
                 action
             };
 
-        info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
+        info!(target: "devflow", "run {} on {}", effective, stack);
         run_action(&final_action)
             .with_context(|| format!("{} failed for {}", effective.canonical(), stack))?;
     }

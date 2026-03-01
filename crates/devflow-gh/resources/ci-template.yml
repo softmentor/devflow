@@ -56,6 +56,14 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      - name: Trivy Vulnerability Scan
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devflow-ci:latest
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
         run: |

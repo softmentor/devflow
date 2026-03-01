@@ -6,7 +6,7 @@ stack = ["node"]
 profile = "container"
 
 [container]
-image = "node-ts-ci"
+image = "devflow-ci-node"
 engine = "auto"
 
 [targets]

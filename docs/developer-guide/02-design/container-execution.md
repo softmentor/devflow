@@ -58,3 +58,12 @@ Developers risk exhausting their local disk space if abandoned container images 
 *   **Routine Image Pruning**: The CLI executor leverages `--rm` on every `docker run` initialization to prevent stopped container metadata leakage. However, large base images persist. You should routinely execute `podman system prune -a --volumes` to sweep away orphaned Devflow fingerprinted images that are no longer referenced by active project branches.
 *   **Extension Cache Invalidation**: Devflow depends on toolchain-specific mechanisms inside the extensions to dictate cache volume pruning. For instance, `sccache` manages its own LRU cache limits natively, so Devflow's `$DWF_CACHE_ROOT/rust/sccache` will not grow infinitely.
 *   **`dwf cache prune` (Roadmap)**: Devflow will eventually expose a top-level cache sub-command which sweeps the `DWF_CACHE_ROOT` and prunes node_modules and cargo registry directories older than a configured timestamp boundary.
+
+## 6. Security Hardening and Bake Process
+
+To maintain professional-grade security, Devflow images follow a "Hardened by Default" policy.
+
+*   **Docker Bake**: Projects utilize `docker-bake.hcl` to orchestrate builds. This enables multi-platform support and `zstd` compression for high-speed image distribution.
+*   **Non-Root Execution**: Containers run as a dedicated `dwfuser` (UID 1001), preventing privilege escalation inside the build environment.
+*   **Init Process**: All images utilize `tini` as `ENTRYPOINT` for reliable signal forwarding.
+*   **Vulnerability Gates**: CI pipelines include automated **Trivy** scanning. Builds are blocked if the CI image contains `CRITICAL` or `HIGH` severity vulnerabilities.
