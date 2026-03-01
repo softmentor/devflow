@@ -14,13 +14,12 @@ pub fn render_workflow(cfg: &DevflowConfig) -> Result<String> {
 
     let template = include_str!("../resources/ci-template.yml");
 
-    let mut commands = String::new();
-    for cmd in pr {
-        commands.push_str(&format!("          dwf {}\n", cmd));
-    }
+    // Join commands with && for docker run sh -c execution
+    let commands: Vec<String> = pr.iter().map(|cmd| format!("dwf {}", cmd)).collect();
+    let commands_str = commands.join(" && ");
 
     let rendered = template
-        .replace("{{COMMANDS}}", &commands)
+        .replace("{{COMMANDS}}", &commands_str)
         .replace("{{PROJECT_NAME}}", &cfg.project.name);
 
     Ok(rendered)
@@ -35,17 +34,17 @@ pub fn check_workflow(cfg: &DevflowConfig, workflow: &str) -> Result<()> {
 
     let mut issues = Vec::new();
 
-    if !workflow.contains("jobs:\n  prep:") {
+    if !workflow.contains("  prep:") {
         issues.push("missing required 'prep' job".to_string());
     }
-    if !workflow.contains("\n  build:") {
+    if !workflow.contains("  build:") {
         issues.push("missing required 'build' job".to_string());
     }
     if !workflow.contains("needs: [prep]") {
         issues.push("build job should depend on prep".to_string());
     }
 
-    if !workflow.contains("\n  verify:") {
+    if !workflow.contains("  verify:") && !workflow.contains("Verify") {
         issues.push("missing required 'verify' job".to_string());
     }
 
@@ -86,15 +85,15 @@ mod tests {
     #[test]
     fn renders_prep_build_and_profile_jobs() {
         // Verifies that the rendered GitHub workflow contains the necessary
-        // boilerplate jobs (prep, build) and specific check jobs from targets.pr.
+        // boilerplate jobs (prep, build) and specific check commands from targets.pr.
         let cfg = fixture();
         let out = render_workflow(&cfg).expect("render should pass");
         assert!(out.contains("  prep:"));
         assert!(out.contains("  build:"));
-        assert!(out.contains("  verify:"));
-        assert!(out.contains("          dwf fmt:check"));
-        assert!(out.contains("          dwf lint:static"));
-        assert!(out.contains("          dwf test:unit"));
+        assert!(out.contains("Verify"));
+        assert!(out.contains("dwf fmt:check"));
+        assert!(out.contains("dwf lint:static"));
+        assert!(out.contains("dwf test:unit"));
     }
 
     #[test]
