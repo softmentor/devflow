@@ -38,6 +38,7 @@ jobs:
 
       - name: Cache CI Image Tar
         if: steps.check.outputs.available == 'true'
+        uses: actions/cache@v4
         with:
           path: ci-image.tar
           key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
