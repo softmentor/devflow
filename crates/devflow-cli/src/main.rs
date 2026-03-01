@@ -18,7 +18,7 @@ mod init;
 #[command(about = "Devflow CLI - Modern developer workflow automation")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
-    command: String,
+    command: Option<String>,
     /// Optional selector (supports `dwf test unit` style)
     selector: Option<String>,
     /// Path to devflow config file.
@@ -44,9 +44,19 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     debug!("parsed cli arguments: {:?}", cli);
 
+    let command_name = match &cli.command {
+        Some(cmd) => cmd,
+        None => {
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            println!(); // Add a newline after help
+            return Ok(());
+        }
+    };
+
     let command_text = match &cli.selector {
-        Some(selector) => format!("{}:{}", cli.command, selector),
-        None => cli.command.clone(),
+        Some(selector) => format!("{}:{}", command_name, selector),
+        None => command_name.clone(),
     };
 
     let command = CommandRef::from_str(&command_text)
@@ -171,7 +181,7 @@ mod tests {
 
     fn test_cli(ci_output: &str) -> Cli {
         Cli {
-            command: "ci".to_string(),
+            command: Some("ci".to_string()),
             selector: None,
             config: "devflow.toml".to_string(),
             stdout: true,
