@@ -110,6 +110,40 @@ ensure_path_persisted() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# Priority 1: Use a local build if available (built from source)
+# ---------------------------------------------------------------------------
+LOCAL_RELEASE="${ROOT_DIR}/target/release/dwf"
+LOCAL_DEBUG="${ROOT_DIR}/target/debug/dwf"
+
+if [ -x "${LOCAL_RELEASE}" ]; then
+    log "found local release build: ${LOCAL_RELEASE}"
+    log "installing to ${TARGET_BIN}"
+    mkdir -p "${INSTALL_DIR}"
+    cp "${LOCAL_RELEASE}" "${TARGET_BIN}"
+    chmod +x "${TARGET_BIN}"
+    ensure_path_persisted
+
+    log "done (from local release build)"
+    log "binary: ${TARGET_BIN}"
+    exit 0
+elif [ -x "${LOCAL_DEBUG}" ]; then
+    log "found local debug build: ${LOCAL_DEBUG}"
+    log "installing to ${TARGET_BIN}"
+    mkdir -p "${INSTALL_DIR}"
+    cp "${LOCAL_DEBUG}" "${TARGET_BIN}"
+    chmod +x "${TARGET_BIN}"
+    ensure_path_persisted
+
+    log "done (from local debug build)"
+    log "binary: ${TARGET_BIN}"
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Priority 2: Fetch pre-compiled binary from GitHub releases
+# ---------------------------------------------------------------------------
+log "no local build found, checking for pre-compiled binary"
 log "determining system architecture"
 OS="$(uname -s)"
 case "$OS" in
@@ -167,6 +201,10 @@ if [ -n "$OS_NAME" ] && [ -n "$ARCH_NAME" ] && command -v curl >/dev/null 2>&1 &
     fi
 fi
 
+
+# ---------------------------------------------------------------------------
+# Priority 3: Build from source as last resort
+# ---------------------------------------------------------------------------
 log "could not install pre-compiled binary, falling back to local compilation"
 log "checking prerequisites"
 require_cmd cargo
