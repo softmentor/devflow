@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hardened Container Infrastructure**: Universal security hardening across all stacks (Rust, Node, Python, Tauri) using 2025 best practices.
 - **Docker Bake Integration**: Centralized, declarative build management with `zstd` compression and multi-platform support.
 - **Vulnerability Scanning**: Integrated Trivy automated scanning into the CI pipeline to fail on CRITICAL/HIGH CVEs.
+- **Local Security Scan**: Added `make scan` and `dwf check:security` for local vulnerability detection via Trivy.
 - **Environmental Cleanup**: Added `make teardown` and `dwf prune:*` commands for localized and remote (GHA) cache/run management.
 
 ### Changed
