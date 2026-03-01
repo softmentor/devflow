@@ -11,14 +11,26 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 mod discovery;
 mod executor;
 mod init;
+mod styles;
+
+use serde_json::json;
+
+#[allow(unused_imports)]
+use styles as s;
 
 /// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
 #[command(name = "dwf")]
-#[command(about = "Devflow CLI - Modern developer workflow automation")]
+#[command(version)]
+#[command(styles = s::get_clap_styles())]
+#[command(
+    help_template = "{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}"
+)]
+#[command(about = "Modern developer workflow automation")]
+#[command(long_about = "Devflow is a high-performance developer workflow engine.")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
-    command: String,
+    command: Option<String>,
     /// Optional selector (supports `dwf test unit` style)
     selector: Option<String>,
     /// Path to devflow config file.
@@ -33,20 +45,53 @@ pub(crate) struct Cli {
     /// Overwrite generated files if they already exist.
     #[arg(long, default_value_t = false)]
     force: bool,
+    /// Report execution status to GitHub (requires GITHUB_TOKEN).
+    /// Context name for the status (e.g., "fmt", "lint").
+    #[arg(long)]
+    report: Option<String>,
+    /// Prune local caches.
+    #[arg(long, default_value_t = false)]
+    local: bool,
+    /// Prune GitHub Actions caches/runs (requires gh CLI).
+    #[arg(long, default_value_t = false)]
+    gh: bool,
+    /// Prune everything (local and GH).
+    #[arg(long, default_value_t = false)]
+    all: bool,
 }
 
 fn main() -> Result<()> {
+    let format = fmt::format()
+        .with_target(false)
+        .with_level(true)
+        .with_timer(fmt::time::uptime())
+        .compact();
+
     tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(
+            fmt::layer()
+                .event_format(format)
+                .with_writer(std::io::stderr),
+        )
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
     let cli = Cli::parse();
     debug!("parsed cli arguments: {:?}", cli);
 
+    let command_name = match &cli.command {
+        Some(cmd) => cmd,
+        None => {
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+            println!(); // Add a newline after help
+            return Ok(());
+        }
+    };
+
     let command_text = match &cli.selector {
-        Some(selector) => format!("{}:{}", cli.command, selector),
-        None => cli.command.clone(),
+        Some(selector) => format!("{}:{}", command_name, selector),
+        None => command_name.clone(),
     };
 
     let command = CommandRef::from_str(&command_text)
@@ -72,8 +117,106 @@ fn main() -> Result<()> {
     execute(&cli, &cfg, &registry, &command)
 }
 
+/// Reports a GitHub status update.
+fn report_status(
+    context: &str,
+    state: &str,
+    description: &str,
+    target_url: Option<&str>,
+) -> Result<()> {
+    let token = match std::env::var("GITHUB_TOKEN") {
+        Ok(t) => t,
+        Err(_) => {
+            debug!("GITHUB_TOKEN not set, skipping status reporting");
+            return Ok(());
+        }
+    };
+
+    let repo = match std::env::var("GITHUB_REPOSITORY") {
+        Ok(r) => r,
+        Err(_) => {
+            debug!("GITHUB_REPOSITORY not set, skipping status reporting");
+            return Ok(());
+        }
+    };
+
+    let sha = std::env::var("GITHUB_HEAD_SHA")
+        .or_else(|_| std::env::var("GITHUB_SHA"))
+        .context("niether GITHUB_HEAD_SHA nor GITHUB_SHA is set")?;
+
+    let url = format!("https://api.github.com/repos/{}/statuses/{}", repo, sha);
+
+    let body = json!({
+        "state": state,
+        "context": context,
+        "description": description,
+        "target_url": target_url,
+    });
+
+    let resp = ureq::post(&url)
+        .set("Authorization", &format!("Bearer {}", token))
+        .set("Accept", "application/vnd.github+json")
+        .set("X-GitHub-Api-Version", "2022-11-28")
+        .send_json(body);
+
+    match resp {
+        Ok(_) => {
+            debug!(
+                "successfully reported status '{}' for context '{}'",
+                state, context
+            );
+            Ok(())
+        }
+        Err(e) => {
+            // We don't want to fail the whole command just because reporting failed,
+            // but we should log it.
+            tracing::warn!("failed to report status to GitHub: {}", e);
+            Ok(())
+        }
+    }
+}
+
+fn get_gha_target_url() -> Option<String> {
+    let repo = std::env::var("GITHUB_REPOSITORY").ok()?;
+    let run_id = std::env::var("GITHUB_RUN_ID").ok()?;
+    Some(format!(
+        "https://github.com/{}/actions/runs/{}",
+        repo, run_id
+    ))
+}
+
 /// Executes a validated Devflow command.
 fn execute(
+    cli: &Cli,
+    cfg: &DevflowConfig,
+    registry: &ExtensionRegistry,
+    command: &CommandRef,
+) -> Result<()> {
+    if let Some(context) = &cli.report {
+        let target_url = get_gha_target_url();
+        report_status(
+            context,
+            "pending",
+            &format!("Running {}...", context),
+            target_url.as_deref(),
+        )?;
+
+        let result = execute_inner(cli, cfg, registry, command);
+
+        let (state, desc) = match &result {
+            Ok(_) => ("success", format!("{} passed", context)),
+            Err(_) => ("failure", format!("{} failed", context)),
+        };
+
+        report_status(context, state, &desc, target_url.as_deref())?;
+        result
+    } else {
+        execute_inner(cli, cfg, registry, command)
+    }
+}
+
+/// Internal execution logic.
+fn execute_inner(
     cli: &Cli,
     cfg: &DevflowConfig,
     registry: &ExtensionRegistry,
@@ -125,11 +268,190 @@ fn execute(
             println!("ci:plan profiles=[{}]", profiles);
             Ok(())
         }
+        PrimaryCommand::Prune => {
+            let selector = command.selector.as_deref().unwrap_or("cache");
+            match selector {
+                "cache" => {
+                    if cli.local || cli.all {
+                        let cache_dir = cfg
+                            .cache
+                            .as_ref()
+                            .and_then(|c| c.root.as_ref())
+                            .map(Path::new)
+                            .unwrap_or(Path::new(".cargo-cache"));
+                        let target_ci = Path::new("target/ci");
+
+                        let before_size = get_dir_size(cache_dir) + get_dir_size(target_ci);
+                        println!(
+                            "🧹 Pruning local caches (Current size: {} MB)...",
+                            before_size / 1024 / 1024
+                        );
+
+                        if cache_dir.exists() {
+                            fs::remove_dir_all(cache_dir).with_context(|| {
+                                format!("failed to remove cache dir '{}'", cache_dir.display())
+                            })?;
+                        }
+                        if target_ci.exists() {
+                            fs::remove_dir_all(target_ci)
+                                .with_context(|| "failed to remove target/ci")?;
+                        }
+
+                        let after_size = get_dir_size(cache_dir) + get_dir_size(target_ci);
+                        println!(
+                            "✨ Local cache pruned. (New size: {} MB, Reclaimed: {} MB)",
+                            after_size / 1024 / 1024,
+                            (before_size.saturating_sub(after_size)) / 1024 / 1024
+                        );
+                    }
+                    if (cli.gh || cli.all) && cli.force {
+                        let before_size = get_gh_cache_size().unwrap_or(0);
+                        println!(
+                            "🔥 Force-pruning ALL GitHub Actions caches (Current: {} MB)...",
+                            before_size / 1024 / 1024
+                        );
+                        run_gh_prune_cache(true)?;
+                        let after_size = get_gh_cache_size().unwrap_or(0);
+                        println!(
+                            "✨ All GH caches purged. (New size: {} MB)",
+                            after_size / 1024 / 1024
+                        );
+                    } else if cli.gh || cli.all {
+                        let before_size = get_gh_cache_size().unwrap_or(0);
+                        println!(
+                            "🧹 Pruning GitHub Actions caches (Current: {} MB)...",
+                            before_size / 1024 / 1024
+                        );
+                        run_gh_prune_cache(false)?;
+                        let after_size = get_gh_cache_size().unwrap_or(0);
+                        println!(
+                            "✨ GH caches pruned. (New size: {} MB, Reclaimed: {} MB)",
+                            after_size / 1024 / 1024,
+                            (before_size.saturating_sub(after_size)) / 1024 / 1024
+                        );
+                    }
+                }
+                "runs" => {
+                    if cli.gh || cli.all {
+                        let before_count = get_gh_run_count().unwrap_or(0);
+                        println!(
+                            "🧹 Pruning GitHub Actions workflow runs (Current: {} runs)...",
+                            before_count
+                        );
+                        run_gh_prune_runs()?;
+                        let after_count = get_gh_run_count().unwrap_or(0);
+                        println!(
+                            "✨ GH runs pruned. (New count: {}, Deleted: {})",
+                            after_count,
+                            before_count.saturating_sub(after_count)
+                        );
+                    }
+                }
+                _ => return Err(anyhow!("unknown prune selector '{}'", selector)),
+            }
+            Ok(())
+        }
         _ => {
             registry.ensure_can_run(command)?;
             executor::run(cfg, registry, command)
         }
     }
+}
+
+fn run_gh_prune_cache(force: bool) -> Result<()> {
+    if force {
+        // Scorched Earth: Delete everything
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("gh cache list --limit 100 --json id --jq '.[].id' | xargs -I {} gh cache delete {}")
+            .status()?;
+        return Ok(());
+    }
+
+    // 1. Stale PR cleanup (>24h)
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json id,ref,lastAccessedAt | jq -r '.[] | select(.ref | startswith(\"refs/pull/\")) | select((.lastAccessedAt | sub(\"\\\\.[0-9]+Z$\"; \"Z\") | fromdateiso8601) < (now - 86400)) | .id' | xargs -I {} gh cache delete {}")
+        .status()?;
+
+    // 2. Capacity-based pruning (>8GB)
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json sizeInBytes --jq '[.[].sizeInBytes] | add // 0'")
+        .output()?;
+    let size_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let total_size: u64 = size_str.parse().unwrap_or(0);
+    let threshold: u64 = 8 * 1024 * 1024 * 1024; // 8GB
+
+    if total_size > threshold {
+        println!(
+            "⚠️ Cache limit reached ({} MB). Pruning refs...",
+            total_size / 1024 / 1024
+        );
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("gh cache list --limit 100 --json ref --jq '.[].ref' | sort | uniq | xargs -I {ref} sh -c 'gh cache list --ref {ref} --json id,key | jq -r \".[] | select(.key | contains(\\\"cargo-\\\")) | .id\" | tail -n +2 | xargs -I {} gh cache delete {}'")
+            .status()?;
+    }
+    Ok(())
+}
+
+fn run_gh_prune_runs() -> Result<()> {
+    // 1. Failed/Canceled
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --status failure --limit 1000 --json databaseId --jq '.[].databaseId' | xargs -I {} gh run delete {}")
+        .status()?;
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --status cancelled --limit 1000 --json databaseId --jq '.[].databaseId' | xargs -I {} gh run delete {}")
+        .status()?;
+
+    // 2. Keep latest 100
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --limit 1000 --json databaseId --jq '.[].databaseId' | tail -n +101 | xargs -I {} gh run delete {}")
+        .status()?;
+    Ok(())
+}
+
+fn get_dir_size(path: &Path) -> u64 {
+    if !path.exists() {
+        return 0;
+    }
+    if path.is_file() {
+        return path.metadata().map(|m| m.len()).unwrap_or(0);
+    }
+    fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| get_dir_size(&e.path()))
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+fn get_gh_cache_size() -> Result<u64> {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json sizeInBytes --jq '[.[].sizeInBytes] | add // 0'")
+        .output()?;
+    let size_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    size_str
+        .parse()
+        .map_err(|e| anyhow!("failed to parse cache size: {}", e))
+}
+
+fn get_gh_run_count() -> Result<u64> {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --limit 1000 --json databaseId --jq 'length'")
+        .output()?;
+    let count_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    count_str
+        .parse()
+        .map_err(|e| anyhow!("failed to parse run count: {}", e))
 }
 
 fn write_ci_workflow(path: &str, content: &str) -> Result<()> {
@@ -171,12 +493,16 @@ mod tests {
 
     fn test_cli(ci_output: &str) -> Cli {
         Cli {
-            command: "ci".to_string(),
+            command: Some("ci".to_string()),
             selector: None,
             config: "devflow.toml".to_string(),
             stdout: true,
             ci_output: ci_output.to_string(),
             force: false,
+            report: None,
+            local: false,
+            gh: false,
+            all: false,
         }
     }
 

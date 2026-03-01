@@ -32,6 +32,7 @@ impl Extension for RustExtension {
             "fmt:check",
             "fmt:fix",
             "lint:static",
+            "lint:security",
             "build:debug",
             "build:release",
             "test:unit",
@@ -69,15 +70,59 @@ impl Extension for RustExtension {
                     "warnings",
                 ],
             )),
+            ("lint", "security") => Some(action(
+                "trivy",
+                &[
+                    "image",
+                    "devflow-ci:latest",
+                    "--severity",
+                    "CRITICAL,HIGH",
+                    "--exit-code",
+                    "1",
+                ],
+            )),
             ("build", "debug") => Some(action("cargo", &["build"])),
             ("build", "release") => Some(action("cargo", &["build", "--release"])),
-            ("test", "unit") => Some(action("cargo", &["test", "--lib", "--bins"])),
+            ("test", "unit") => Some(action("cargo", &["nextest", "run", "--lib", "--bins"])),
             ("test", "integration") => Some(action("cargo", &["test", "--tests"])),
             ("test", "smoke") => Some(action("cargo", &["test", "smoke"])),
             ("package", "artifact") => Some(action("cargo", &["build", "--release"])),
             ("release", "candidate") => Some(action("cargo", &["build", "--release"])),
             _ => None,
         }
+    }
+
+    fn cache_mounts(&self) -> Vec<String> {
+        vec![
+            "rust/cargo:/workspace/.cargo-cache".to_string(),
+            "rust/target:/workspace/target/ci".to_string(),
+        ]
+    }
+
+    fn env_vars(&self) -> std::collections::HashMap<String, String> {
+        let mut env = std::collections::HashMap::new();
+        env.insert(
+            "CARGO_HOME".to_string(),
+            "/workspace/.cargo-cache".to_string(),
+        );
+        env.insert(
+            "CARGO_TARGET_DIR".to_string(),
+            "/workspace/target/ci".to_string(),
+        );
+        env.insert(
+            "SCCACHE_DIR".to_string(),
+            "/workspace/.cargo-cache/sccache".to_string(),
+        );
+        env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+        env
+    }
+
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        vec![
+            "Cargo.lock".to_string(),
+            "rust-toolchain.toml".to_string(),
+            "Cargo.toml".to_string(),
+        ]
     }
 }
 
@@ -86,6 +131,7 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
     ExecutionAction {
         program: program.to_string(),
         args: args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
     }
 }
 

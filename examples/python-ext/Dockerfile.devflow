@@ -1,0 +1,32 @@
+# Devflow Python container blueprint
+# 2025 Best Practices: Non-root, Tini, BuildKit Cache Mounts
+
+FROM python:3.14.3-slim AS base
+LABEL org.opencontainers.image.description="Devflow Python Base (Debian Slim + Tini)"
+
+# Install system dependencies with cache mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    tini \
+    ca-certificates \
+    --no-install-recommends
+
+# Setup non-root user (UID 1001)
+RUN groupadd -g 1001 dwfgroup && \
+    useradd -u 1001 -g dwfgroup -m -s /bin/bash dwfuser
+
+WORKDIR /workspace
+
+# Install python tools with cache mounts
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install pytest flake8 black --no-cache-dir
+
+# Set ownership and switch to non-root user
+RUN chown -R dwfuser:dwfgroup /workspace
+USER dwfuser
+
+ENTRYPOINT ["/usr/bin/tini", "--"]

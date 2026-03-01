@@ -28,6 +28,8 @@ pub enum PrimaryCommand {
     Release,
     /// CI-related operations (e.g., configuration generation).
     Ci,
+    /// Prune redundant caches or runs.
+    Prune,
 }
 
 impl PrimaryCommand {
@@ -44,6 +46,7 @@ impl PrimaryCommand {
             Self::Check => "check",
             Self::Release => "release",
             Self::Ci => "ci",
+            Self::Prune => "prune",
         }
     }
 
@@ -60,6 +63,7 @@ impl PrimaryCommand {
             Self::Release => "candidate",
             Self::Ci => "check",
             Self::Init => "rust",
+            Self::Prune => "cache",
         }
     }
 }
@@ -116,6 +120,7 @@ impl FromStr for CommandRef {
             "check" => PrimaryCommand::Check,
             "release" => PrimaryCommand::Release,
             "ci" => PrimaryCommand::Ci,
+            "prune" => PrimaryCommand::Prune,
             _ => return Err(CommandParseError::UnknownPrimary(primary_text.to_string())),
         };
 

@@ -16,6 +16,9 @@ pub struct ExecutionAction {
     pub program: String,
     /// The arguments to pass to the program.
     pub args: Vec<String>,
+    /// Optional environment variables to set for the execution.
+    #[serde(default)]
+    pub env: HashMap<String, String>,
 }
 
 /// A contract for all extensions connecting to Devflow.
@@ -26,6 +29,24 @@ pub trait Extension: std::fmt::Debug {
     fn capabilities(&self) -> HashSet<String>;
     /// Maps a command reference to an executable action.
     fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction>;
+
+    /// Returns the host-to-container volume mappings required by this extension.
+    /// Expected format: `host_relative_dir:container_absolute_dir`
+    /// Example: `rust/cargo:/usr/local/cargo`
+    fn cache_mounts(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Returns the environment variables required by this extension for execution.
+    fn env_vars(&self) -> HashMap<String, String> {
+        HashMap::new()
+    }
+
+    /// Returns a list of files or globs that constitute the execution fingerprint identity.
+    /// Example: `["rust-toolchain.toml", "Cargo.lock"]`
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// A registry containing all discovered Devflow extensions.
@@ -119,10 +140,29 @@ impl ExtensionRegistry {
     /// Builds the execution arguments for a command against a specific extension.
     pub fn build_action(&self, name: &str, cmd: &CommandRef) -> Option<ExecutionAction> {
         if let Some(ext) = self.extensions.get(name) {
-            ext.build_action(cmd)
+            let mut action = ext.build_action(cmd)?;
+            // Merge extension global envs with action-specific envs
+            let mut merged_env = ext.env_vars();
+            merged_env.extend(action.env);
+            action.env = merged_env;
+            Some(action)
         } else {
             None
         }
+    }
+
+    /// Aggregates all cache mounts requested by the active extensions.
+    /// Used by the container executor to map generic host directories.
+    pub fn all_cache_mounts(&self) -> Vec<String> {
+        let mut mounts = HashSet::new();
+        for ext in self.extensions.values() {
+            for mount in ext.cache_mounts() {
+                mounts.insert(mount);
+            }
+        }
+        let mut sorted: Vec<String> = mounts.into_iter().collect();
+        sorted.sort();
+        sorted
     }
 }
 
@@ -161,6 +201,7 @@ mod tests {
             action: Some(ExecutionAction {
                 program: "echo".to_string(),
                 args: vec!["hello".to_string()],
+                env: HashMap::new(),
             }),
         };
 

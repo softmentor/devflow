@@ -7,6 +7,7 @@ pub mod command;
 pub mod config;
 pub mod constants;
 pub mod extension;
+pub mod fingerprint;
 pub mod project;
 pub mod runtime;
 

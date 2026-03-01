@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+dist/
+*.o
+*.d
+
+# Caches
+.cache/
+.cargo-cache/
+.npm-cache/
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# CI artifacts
+ci-image.tar
+
+# Documentation build output
+docs/_build/
+
+# Agent files
+.gemini/
+.claude/
+.agents/

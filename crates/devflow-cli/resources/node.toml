@@ -12,3 +12,9 @@ main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integrat
 [extensions.node]
 source = "builtin"
 required = true
+
+[container]
+# You can customize this base image via Dockerfile.devflow
+image = "my-node-project-ci:latest"
+engine = "auto"
+

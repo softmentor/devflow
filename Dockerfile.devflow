@@ -1,0 +1,36 @@
+# Devflow multi-stage Rust container execution blueprint
+# This Dockerfile provides the deterministic environment for Devflow's own CI.
+
+FROM rust:1.93.1-slim-bookworm AS ci
+LABEL org.opencontainers.image.description="Devflow Internal CI (rustc, nextest, sccache)"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    python3 \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Rust components
+RUN rustup component add rustfmt clippy
+
+# Install cargo-nextest and sccache dynamically
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ]; then \
+        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-aarch64-unknown-linux-gnu.tar.gz" ; \
+        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-aarch64-unknown-linux-musl.tar.gz" ; \
+        SCCACHE_FOLDER="sccache-v0.8.1-aarch64-unknown-linux-musl" ; \
+    else \
+        NEXTEST_URL="https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.128/cargo-nextest-0.9.128-x86_64-unknown-linux-gnu.tar.gz" ; \
+        SCCACHE_URL="https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-x86_64-unknown-linux-musl.tar.gz" ; \
+        SCCACHE_FOLDER="sccache-v0.8.1-x86_64-unknown-linux-musl" ; \
+    fi && \
+    curl -LsSf $NEXTEST_URL | tar zxf - -C /usr/local/bin && \
+    curl -LsSf $SCCACHE_URL | tar zxf - --strip-components=1 -C /usr/local/bin $SCCACHE_FOLDER/sccache
+
+ENV RUSTC_WRAPPER=sccache
+WORKDIR /workspace

@@ -3,7 +3,11 @@ name = "node-ts"
 stack = ["node"]
 
 [runtime]
-profile = "auto"
+profile = "container"
+
+[container]
+image = "devflow-ci-node"
+engine = "auto"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]

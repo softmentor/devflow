@@ -12,6 +12,7 @@ project:
         - file: user-guide/commands.md
         - file: user-guide/configuration.md
         - file: user-guide/new-stacks.md
+        - file: user-guide/multi-stack.md
         - file: user-guide/custom-extensions.md
         - file: user-guide/ci-workflows.md
         - file: user-guide/troubleshooting.md
@@ -27,6 +28,7 @@ project:
             - file: developer-guide/02-design/architecture.md
             - file: developer-guide/02-design/command-model.md
             - file: developer-guide/02-design/extensions.md
+            - file: developer-guide/02-design/container-execution.md
             - title: ADRs
               file: developer-guide/02-design/adr/index.md
               children:
@@ -64,3 +66,5 @@ project:
       file: reference.md
       children:
         - file: glossary.md
+        - title: Source Code Documentation
+          url: https://softmentor.github.io/devflow/rustdoc/devflow_core/index.html

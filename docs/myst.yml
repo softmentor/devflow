@@ -26,7 +26,7 @@ site:
     url: https://softmentor.github.io/devflow/
     folders: false
     hide_authors: true
-    logo_text: Devflow v0.1.0
+    logo_text: Devflow v0.2.0
     logo: assets/images/devflow-icon.svg
     logo_dark: assets/images/devflow-icon.svg
     favicon: assets/images/devflow-icon.svg

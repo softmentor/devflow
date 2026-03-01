@@ -13,5 +13,11 @@ main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integrat
 source = "builtin"
 required = true
 
+[container]
+# You can customize this base image via Dockerfile.devflow
+image = "my-typescript-project-ci:latest"
+engine = "auto"
+
+
 # Ensure your package.json scripts expose these selectors:
 # fmt:check, lint, build, test:unit, test:integration

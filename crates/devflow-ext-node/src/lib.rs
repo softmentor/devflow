@@ -66,6 +66,25 @@ impl Extension for NodeExtension {
             _ => None,
         }
     }
+
+    fn cache_mounts(&self) -> Vec<String> {
+        vec!["node/npm:/root/.npm".to_string()]
+    }
+
+    fn env_vars(&self) -> std::collections::HashMap<String, String> {
+        let mut env = std::collections::HashMap::new();
+        env.insert("NPM_CONFIG_CACHE".to_string(), "/root/.npm".to_string());
+        env
+    }
+
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        vec![
+            "package-lock.json".to_string(),
+            "yarn.lock".to_string(),
+            "pnpm-lock.yaml".to_string(),
+            "package.json".to_string(),
+        ]
+    }
 }
 
 /// Helper for constructing `ExecutionAction`s concisely.
@@ -73,6 +92,7 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
     ExecutionAction {
         program: program.to_string(),
         args: args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
     }
 }
 

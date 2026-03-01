@@ -110,6 +110,8 @@ jobs:
     needs: [prep]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
@@ -166,6 +168,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
@@ -223,11 +227,11 @@ jobs:
             -e GITHUB_RUN_ID=${{ github.run_id }} \
             -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             devflow-ci:latest \
-            sh -c "pids=(); dwf --report fmt-check fmt:check & pids+=($!); dwf --report lint-static lint:static & pids+=($!); dwf --report build-debug build:debug & pids+=($!); dwf --report test-unit test:unit & pids+=($!); dwf --report test-integration test:integration & pids+=($!); exit_code=0; for pid in ${pids[@]}; do wait $pid || exit_code=$?; done; exit $exit_code"
+            sh -c "{{COMMANDS}}"
 
       - name: Fix Cache Permissions
         if: always()
         run: |
           sudo chown -R $(id -u):$(id -g) .cargo-cache target/ci || true
           sudo chmod -R 777 .cargo-cache target/ci || true
-# project: devflow
+# project: {{PROJECT_NAME}}
