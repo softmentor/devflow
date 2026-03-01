@@ -60,11 +60,19 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
 
         attempted = true;
 
-        let final_action = if cfg.runtime.profile == RuntimeProfile::Container {
-            build_container_proxy(cfg, registry, &action)?
-        } else {
-            action
-        };
+        // When IS_CONTAINER=true (e.g., inside GHA native container: job),
+        // skip the docker-run proxy even if profile is "container".
+        // This matches the kroki-rs pattern for native container execution.
+        let is_already_in_container = std::env::var("IS_CONTAINER")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
+        let final_action =
+            if cfg.runtime.profile == RuntimeProfile::Container && !is_already_in_container {
+                build_container_proxy(cfg, registry, &action)?
+            } else {
+                action
+            };
 
         info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
         run_action(&final_action)
