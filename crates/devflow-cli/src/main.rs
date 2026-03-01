@@ -44,7 +44,7 @@ Common Commands:
 "
 )]
 #[command(
-    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
+    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf check security\x1b[0m        \x1b[2m# Run local vulnerability scan\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
 )]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
