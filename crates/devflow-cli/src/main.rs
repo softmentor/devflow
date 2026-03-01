@@ -14,7 +14,9 @@ mod init;
 
 /// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
+#[command(name = "dwf")]
 #[command(version)]
+#[command(help_template = "{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}")]
 #[command(about = concat!("Devflow CLI v", env!("CARGO_PKG_VERSION"), " - Modern developer workflow automation"))]
 #[command(long_about = concat!("Devflow v", env!("CARGO_PKG_VERSION"), "\n\n", "Devflow is a high-performance developer workflow engine designed for consistency 
 between local development and CI environments. It uses a container-first 
@@ -72,8 +74,6 @@ fn main() -> Result<()> {
         Some(cmd) => cmd,
         None => {
             use clap::CommandFactory;
-            println!("dwf {}", env!("CARGO_PKG_VERSION"));
-            println!();
             Cli::command().print_help()?;
             println!(); // Add a newline after help
             return Ok(());
