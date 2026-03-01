@@ -15,4 +15,4 @@ required = true
 
 [container]
 image = "rust-lib-ci"
-engine = "podman"
+engine = "auto"

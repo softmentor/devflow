@@ -19,4 +19,4 @@ required = true
 
 [container]
 image = "tauri-ci"
-engine = "podman"
+engine = "auto"

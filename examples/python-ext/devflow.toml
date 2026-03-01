@@ -15,7 +15,7 @@ main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integrat
 
 [container]
 image = "python-ext-ci"
-engine = "podman"
+engine = "auto"
 
 [extensions.python]
 source = "path"

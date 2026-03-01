@@ -7,7 +7,7 @@ profile = "container"
 
 [container]
 image = "node-ts-ci"
-engine = "podman"
+engine = "auto"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
