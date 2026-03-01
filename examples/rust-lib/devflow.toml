@@ -14,5 +14,5 @@ source = "builtin"
 required = true
 
 [container]
-image = "rust-lib-ci"
-engine = "podman"
+image = "devflow-ci-rust"
+engine = "auto"

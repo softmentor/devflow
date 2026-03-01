@@ -25,7 +25,7 @@ const CONTAINER_WORKSPACE: &str = "/workspace";
 const CONTAINER_DWF_BIN: &str = "/usr/local/bin/dwf";
 
 /// Runs a Devflow command by dispatching it to applicable stacks.
-#[instrument(skip(cfg, registry))]
+#[instrument(skip(cfg, registry), fields(command = %command))]
 pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandRef) -> Result<()> {
     let mut attempted = false;
 
@@ -74,7 +74,7 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
                 action
             };
 
-        info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
+        info!(target: "devflow", "run {} on {}", effective, stack);
         run_action(&final_action)
             .with_context(|| format!("{} failed for {}", effective.canonical(), stack))?;
     }
@@ -264,10 +264,14 @@ fn resolve_engine(engine_cfg: ContainerEngine) -> Result<String> {
         ContainerEngine::Docker => "docker",
         ContainerEngine::Podman => "podman",
         ContainerEngine::Auto => {
-            if command_exists("docker") {
+            if is_engine_healthy("podman") {
+                "podman"
+            } else if is_engine_healthy("docker") {
                 "docker"
             } else if command_exists("podman") {
                 "podman"
+            } else if command_exists("docker") {
+                "docker"
             } else {
                 bail!("no container engine (docker or podman) found on PATH");
             }
@@ -278,7 +282,23 @@ fn resolve_engine(engine_cfg: ContainerEngine) -> Result<String> {
         bail!("required container engine '{cmd}' is not installed or not on PATH");
     }
 
+    info!(target: "devflow", "using container engine: {}", cmd);
     Ok(cmd.to_string())
+}
+
+/// Checks if an engine is not only installed but also has a responsive daemon.
+fn is_engine_healthy(name: &str) -> bool {
+    if !command_exists(name) {
+        return false;
+    }
+    // 'info' usually requires a working daemon link
+    Command::new(name)
+        .arg("info")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 fn resolve_cache_root(cfg: &DevflowConfig, root: &str) -> PathBuf {

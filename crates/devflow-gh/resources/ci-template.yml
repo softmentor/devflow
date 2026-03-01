@@ -2,8 +2,6 @@ name: ci
 
 on: [pull_request, push]
 
-env:
-  DWF_CACHE_ROOT: .cache/devflow
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -57,6 +55,14 @@ jobs:
           tags: devflow-ci:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Trivy Vulnerability Scan
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devflow-ci:latest
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -169,6 +175,11 @@ jobs:
             -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
             -e RUSTC_WRAPPER=sccache \
             -e IS_CONTAINER=true \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e GITHUB_REPOSITORY=${{ github.repository }} \
+            -e GITHUB_SHA=${{ github.sha }} \
+            -e GITHUB_HEAD_SHA=${{ github.event.pull_request.head.sha }} \
+            -e GITHUB_RUN_ID=${{ github.run_id }} \
             -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             devflow-ci:latest \
             sh -c "{{COMMANDS}}"
