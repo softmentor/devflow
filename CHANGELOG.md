@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Container Execution**: Support for running Devflow tasks inside isolated containers (Docker/Podman).
 - **Deterministic Fingerprinting**: Environment identity based on `Dockerfile` and toolchain manifests.
 - **Unified Cache Parity**: Consistent volume mounting strategy for `.cargo`, `.npm`, and extension caches across local and CI.
-- **GitHub Actions Generator**: Modernized `dwf ci:generate` with `kroki-rs` style cache optimizations.
+- **GitHub Actions Generator**: Modernized `dwf ci:generate` with Buildx layer caching and native container execution.
 - **Subprocess Extensions**: Support for JSON-RPC subprocess extensions within containerized boundaries.
 
 ### Changed

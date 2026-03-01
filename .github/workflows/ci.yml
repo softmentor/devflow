@@ -67,7 +67,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Phase 2 — Build: warm the cargo/sccache cache inside the CI container
-  # Uses GHA native container: directive (like kroki-rs) for shared filesystem.
+  # Runs inside the CI container for shared filesystem and cache parity.
   # ---------------------------------------------------------------------------
   build:
     name: "Build"
