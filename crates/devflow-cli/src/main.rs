@@ -32,44 +32,52 @@ use styles as s;
 between local development and CI environments. It uses a container-first 
 approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
-\x1b[1;32mCommand Glossary:\x1b[0m
-  \x1b[1mInitialization & Environment\x1b[0m
-    \x1b[36minit\x1b[0m                       Bootstrap a project (detects stack automatically)
-    \x1b[36msetup:doctor\x1b[0m               Verify host toolchains and environment
-    \x1b[36msetup:deps\x1b[0m                 Fetch and pre-cache project dependencies
-    \x1b[36msetup:toolchain\x1b[0m            Install/update required language toolchains
+Command Glossary:
+  Initialization & Environment
+    init                       Bootstrap a project (detects stack automatically)
+    setup:doctor               Verify host toolchains and environment
+    setup:deps                 Fetch and pre-cache project dependencies
+    setup:toolchain            Install/update required language toolchains
 
-  \x1b[1mVerification & Security\x1b[0m
-    \x1b[36mcheck:pr\x1b[0m                   Run the standard PR verification (fmt, lint, build, test)
-    \x1b[36mcheck:security\x1b[0m             Run local vulnerability scan on CI images (requires Trivy)
+  Verification & Security
+    check:pr                   Run the standard PR verification (fmt, lint, build, test)
+    check:security             Run local vulnerability scan on CI images (requires Trivy)
 
-  \x1b[1mDevelopment Workflow\x1b[0m
-    \x1b[36mfmt:check\x1b[0m                  Check if code matches project formatting standards
-    \x1b[36mfmt:fix\x1b[0m                    Automatically apply formatting fixes
-    \x1b[36mlint:static\x1b[0m                Run clippy, eslint, or other static analyzers
-    \x1b[36mbuild:debug\x1b[0m                Perform an incremental debug build
-    \x1b[36mbuild:release\x1b[0m              Perform an optimized production build
-    \x1b[36mtest:unit\x1b[0m                  Run project unit tests
-    \x1b[36mtest:integration\x1b[0m           Run integration/infrastructure tests
-    \x1b[36mtest:smoke\x1b[0m                 Run high-level end-to-end smoke tests
+  Development Workflow
+    fmt:check                  Check if code matches project formatting standards
+    fmt:fix                    Automatically apply formatting fixes
+    lint:static                Run clippy, eslint, or other static analyzers
+    build:debug                Perform an incremental debug build
+    build:release              Perform an optimized production build
+    test:unit                  Run project unit tests
+    test:integration           Run integration/infrastructure tests
+    test:smoke                 Run high-level end-to-end smoke tests
 
-  \x1b[1mCI Infrastructure\x1b[0m
-    \x1b[36mci:generate\x1b[0m                Sync .github/workflows/ci.yml with devflow.toml
-    \x1b[36mci:check\x1b[0m                   Verify if local CI workflow matches current config
-    \x1b[36mci:plan\x1b[0m                    Preview the CI execution strategy and profiles
+  CI Infrastructure
+    ci:generate                Sync .github/workflows/ci.yml with devflow.toml
+    ci:check                   Verify if local CI workflow matches current config
+    ci:plan                    Preview the CI execution strategy and profiles
 
-  \x1b[1mMaintenance\x1b[0m
-    \x1b[36mprune:cache\x1b[0m                Cleanup local or GHA caches (use --local, --gh, --all)
-    \x1b[36mprune:runs\x1b[0m                 Clean up stale GHA workflow runs (use --gh)
+  Maintenance
+    prune:cache                Cleanup local or GHA caches (use --local, --gh, --all)
+    prune:runs                 Clean up stale GHA workflow runs (use --gh)
 
-  \x1b[1mRelease\x1b[0m
-    \x1b[36mpackage:artifact\x1b[0m           Build and bundle project distribution artifacts
-    \x1b[36mrelease:candidate\x1b[0m          Tag and prepare a new release candidate
+  Release
+    package:artifact           Build and bundle project distribution artifacts
+    release:candidate          Tag and prepare a new release candidate
 "
 )]
-#[command(
-    after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf check security\x1b[0m        \x1b[2m# Run local vulnerability scan\x1b[0m\n  \x1b[36mdwf prune:cache --all\x1b[0m     \x1b[2m# Prune local and GH caches\x1b[0m\n  \x1b[36mdwf prune:runs --gh\x1b[0m       \x1b[2m# Prune remote workflow runs\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow"
-)]
+#[command(after_help = "Examples:
+  dwf init                  # Bootstrap a new project
+  dwf check pr              # Run all PR checks (shorthand for check:pr)
+  dwf check security        # Run local vulnerability scan
+  dwf prune:cache --all     # Prune local and GH caches
+  dwf prune:runs --gh       # Prune remote workflow runs
+  dwf fmt fix               # Fix formatting across the project
+  dwf test unit             # Run unit tests only
+  dwf ci:generate           # Update .github/workflows/ci.yml
+
+GitHub Repository: https://github.com/softmentor/devflow")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,

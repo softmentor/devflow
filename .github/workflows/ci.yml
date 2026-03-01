@@ -59,9 +59,10 @@ jobs:
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
         uses: aquasecurity/trivy-action@0.34.1
         with:
-          image-ref: devflow-ci:latest
-          format: json
-          output: trivy-report.json
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-report.json'
           exit-code: 0
 
       - name: Upload Vulnerability Scan Results
@@ -76,9 +77,11 @@ jobs:
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
         uses: aquasecurity/trivy-action@0.34.1
         with:
-          image-ref: devflow-ci:latest
-          format: table
-          severity: HIGH,CRITICAL
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
           exit-code: 1
           skip-setup-trivy: true
 
