@@ -291,34 +291,54 @@ fn execute_inner(
             match selector {
                 "cache" => {
                     if cli.local || cli.all {
-                        println!("🧹 Pruning local caches...");
                         let cache_dir = cfg.cache.as_ref().and_then(|c| c.root.as_ref())
                             .map(Path::new)
                             .unwrap_or(Path::new(".cargo-cache"));
+                        let target_ci = Path::new("target/ci");
+                        
+                        let before_size = get_dir_size(cache_dir) + get_dir_size(target_ci);
+                        println!("🧹 Pruning local caches (Current size: {} MB)...", before_size / 1024 / 1024);
+
                         if cache_dir.exists() {
                             fs::remove_dir_all(cache_dir).with_context(|| format!("failed to remove cache dir '{}'", cache_dir.display()))?;
                         }
-                        let target_ci = Path::new("target/ci");
                         if target_ci.exists() {
                             fs::remove_dir_all(target_ci).with_context(|| "failed to remove target/ci")?;
                         }
-                        println!("✨ Local cache pruned.");
+                        
+                        let after_size = get_dir_size(cache_dir) + get_dir_size(target_ci);
+                        println!("✨ Local cache pruned. (New size: {} MB, Reclaimed: {} MB)", 
+                            after_size / 1024 / 1024, 
+                            (before_size.saturating_sub(after_size)) / 1024 / 1024
+                        );
                     }
                     if (cli.gh || cli.all) && cli.force {
-                        println!("🔥 Force-pruning ALL GitHub Actions caches (Scorched Earth)...");
+                        let before_size = get_gh_cache_size().unwrap_or(0);
+                        println!("🔥 Force-pruning ALL GitHub Actions caches (Current: {} MB)...", before_size / 1024 / 1024);
                         run_gh_prune_cache(true)?;
-                        println!("✨ All GH caches purged.");
+                        let after_size = get_gh_cache_size().unwrap_or(0);
+                        println!("✨ All GH caches purged. (New size: {} MB)", after_size / 1024 / 1024);
                     } else if cli.gh || cli.all {
-                        println!("🧹 Pruning GitHub Actions caches (Standard Safety)...");
+                        let before_size = get_gh_cache_size().unwrap_or(0);
+                        println!("🧹 Pruning GitHub Actions caches (Current: {} MB)...", before_size / 1024 / 1024);
                         run_gh_prune_cache(false)?;
-                        println!("✨ GH caches pruned.");
+                        let after_size = get_gh_cache_size().unwrap_or(0);
+                        println!("✨ GH caches pruned. (New size: {} MB, Reclaimed: {} MB)", 
+                            after_size / 1024 / 1024,
+                            (before_size.saturating_sub(after_size)) / 1024 / 1024
+                        );
                     }
                 }
                 "runs" => {
                     if cli.gh || cli.all {
-                        println!("🧹 Pruning GitHub Actions workflow runs...");
+                        let before_count = get_gh_run_count().unwrap_or(0);
+                        println!("🧹 Pruning GitHub Actions workflow runs (Current: {} runs)...", before_count);
                         run_gh_prune_runs()?;
-                        println!("✨ GH runs pruned.");
+                        let after_count = get_gh_run_count().unwrap_or(0);
+                        println!("✨ GH runs pruned. (New count: {}, Deleted: {})", 
+                            after_count,
+                            before_count.saturating_sub(after_count)
+                        );
                     }
                 }
                 _ => return Err(anyhow!("unknown prune selector '{}'", selector)),
@@ -384,6 +404,41 @@ fn run_gh_prune_runs() -> Result<()> {
         .arg("gh run list --limit 1000 --json databaseId --jq '.[].databaseId' | tail -n +101 | xargs -I {} gh run delete {}")
         .status()?;
     Ok(())
+}
+
+fn get_dir_size(path: &Path) -> u64 {
+    if !path.exists() {
+        return 0;
+    }
+    if path.is_file() {
+        return path.metadata().map(|m| m.len()).unwrap_or(0);
+    }
+    fs::read_dir(path)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| get_dir_size(&e.path()))
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
+fn get_gh_cache_size() -> Result<u64> {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh cache list --limit 100 --json sizeInBytes --jq '[.[].sizeInBytes] | add // 0'")
+        .output()?;
+    let size_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    size_str.parse().map_err(|e| anyhow!("failed to parse cache size: {}", e))
+}
+
+fn get_gh_run_count() -> Result<u64> {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("gh run list --limit 1000 --json databaseId --jq 'length'")
+        .output()?;
+    let count_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    count_str.parse().map_err(|e| anyhow!("failed to parse run count: {}", e))
 }
 
 fn write_ci_workflow(path: &str, content: &str) -> Result<()> {
