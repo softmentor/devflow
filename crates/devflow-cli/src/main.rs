@@ -33,28 +33,38 @@ between local development and CI environments. It uses a container-first
 approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
 \x1b[1;32mCommand Glossary:\x1b[0m
-  \x1b[1mInitialization\x1b[0m
-    \x1b[36minit\x1b[0m                       Bootstrap a project (detects stack)
-    \x1b[36msetup:[doctor|deps|toolchain]\x1b[0m Setup environment & verify tools
+  \x1b[1mInitialization & Environment\x1b[0m
+    \x1b[36minit\x1b[0m                       Bootstrap a project (detects stack automatically)
+    \x1b[36msetup:doctor\x1b[0m               Verify host toolchains and environment
+    \x1b[36msetup:deps\x1b[0m                 Fetch and pre-cache project dependencies
+    \x1b[36msetup:toolchain\x1b[0m            Install/update required language toolchains
 
   \x1b[1mVerification & Security\x1b[0m
-    \x1b[36mcheck:[pr|security]\x1b[0m        Run PR policy or local security scan
+    \x1b[36mcheck:pr\x1b[0m                   Run the standard PR verification (fmt, lint, build, test)
+    \x1b[36mcheck:security\x1b[0m             Run local vulnerability scan on CI images (requires Trivy)
 
-  \x1b[1mCore Development\x1b[0m
-    \x1b[36mfmt:[check|fix]\x1b[0m            Check or apply code formatting
-    \x1b[36mlint:static\x1b[0m                Run static analysis (clippy, eslint, etc.)
-    \x1b[36mbuild:[debug|release]\x1b[0m      Perform incremental or optimized builds
-    \x1b[36mtest:[unit|integration|smoke]\x1b[0m Run specific test suites
+  \x1b[1mDevelopment Workflow\x1b[0m
+    \x1b[36mfmt:check\x1b[0m                  Check if code matches project formatting standards
+    \x1b[36mfmt:fix\x1b[0m                    Automatically apply formatting fixes
+    \x1b[36mlint:static\x1b[0m                Run clippy, eslint, or other static analyzers
+    \x1b[36mbuild:debug\x1b[0m                Perform an incremental debug build
+    \x1b[36mbuild:release\x1b[0m              Perform an optimized production build
+    \x1b[36mtest:unit\x1b[0m                  Run project unit tests
+    \x1b[36mtest:integration\x1b[0m           Run integration/infrastructure tests
+    \x1b[36mtest:smoke\x1b[0m                 Run high-level end-to-end smoke tests
 
-  \x1b[1mCI & Infrastructure\x1b[0m
-    \x1b[36mci:[generate|check|plan]\x1b[0m   Manage .github/workflows/ci.yml
+  \x1b[1mCI Infrastructure\x1b[0m
+    \x1b[36mci:generate\x1b[0m                Sync .github/workflows/ci.yml with devflow.toml
+    \x1b[36mci:check\x1b[0m                   Verify if local CI workflow matches current config
+    \x1b[36mci:plan\x1b[0m                    Preview the CI execution strategy and profiles
 
   \x1b[1mMaintenance\x1b[0m
-    \x1b[36mprune:[cache|runs]\x1b[0m         Cleanup local/remote state (use --local, --gh)
+    \x1b[36mprune:cache\x1b[0m                Cleanup local or GHA caches (use --local, --gh, --all)
+    \x1b[36mprune:runs\x1b[0m                 Clean up stale GHA workflow runs (use --gh)
 
   \x1b[1mRelease\x1b[0m
-    \x1b[36mrelease:candidate\x1b[0m          Prepare or verify a release candidate
-    \x1b[36mpackage:artifact\x1b[0m           Package the project for distribution
+    \x1b[36mpackage:artifact\x1b[0m           Build and bundle project distribution artifacts
+    \x1b[36mrelease:candidate\x1b[0m          Tag and prepare a new release candidate
 "
 )]
 #[command(
