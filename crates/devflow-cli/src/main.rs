@@ -11,23 +11,20 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 mod discovery;
 mod executor;
 mod init;
+mod styles;
 
-const CLI_STYLES: clap::builder::Styles = clap::builder::Styles::styled()
-    .header(clap::builder::styling::AnsiColor::Green.on_default().bold())
-    .usage(clap::builder::styling::AnsiColor::Green.on_default().bold())
-    .literal(clap::builder::styling::AnsiColor::Cyan.on_default())
-    .placeholder(clap::builder::styling::AnsiColor::Cyan.on_default());
+use styles as s;
 
 /// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
 #[command(name = "dwf")]
 #[command(version)]
-#[command(styles = CLI_STYLES)]
-#[command(help_template = "\x1b[1mdwf {version}\x1b[0m\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}")]
-#[command(about = "Devflow CLI - Modern developer workflow automation")]
-#[command(long_about = r#"Devflow is a high-performance developer workflow engine designed for consistency 
+#[command(styles = s::get_clap_styles())]
+#[command(help_template = "\x1b[1;34mDevflow CLI - High Performance Workflow Engine\x1b[0m\n\n{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}")]
+#[command(about = "Modern developer workflow automation")]
+#[command(long_about = "Devflow is a high-performance developer workflow engine designed for consistency 
 between local development and CI environments. It uses a container-first 
-approach to ensure that "it works on my machine" means "it works in CI".
+approach to ensure that \"it works on my machine\" means \"it works in CI\".
 
 Common Commands:
   init              Initialize a new devflow.toml in the current directory
@@ -38,8 +35,8 @@ Common Commands:
   build:debug       Perform a debug build
   test:unit         Run unit tests
   ci:generate       Generate or update the GitHub Actions workflow
-"#)]
-#[command(after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  # Bootstrap a new project\n  \x1b[36mdwf check pr\x1b[0m              # Run all PR checks (shorthand for check:pr)\n  \x1b[36mdwf fmt fix\x1b[0m               # Fix formatting across the project\n  \x1b[36mdwf test unit\x1b[0m             # Run unit tests only\n  \x1b[36mdwf ci:generate\x1b[0m           # Update .github/workflows/ci.yml\n\n\x1b[1;34mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow")]
+")]
+#[command(after_help = "\x1b[1;32mExamples:\x1b[0m\n  \x1b[36mdwf init\x1b[0m                  \x1b[2m# Bootstrap a new project\x1b[0m\n  \x1b[36mdwf check pr\x1b[0m              \x1b[2m# Run all PR checks (shorthand for check:pr)\x1b[0m\n  \x1b[36mdwf fmt fix\x1b[0m               \x1b[2m# Fix formatting across the project\x1b[0m\n  \x1b[36mdwf test unit\x1b[0m             \x1b[2m# Run unit tests only\x1b[0m\n  \x1b[36mdwf ci:generate\x1b[0m           \x1b[2m# Update .github/workflows/ci.yml\x1b[0m\n\n\x1b[1;32mGitHub Repository:\x1b[0m https://github.com/softmentor/devflow")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,

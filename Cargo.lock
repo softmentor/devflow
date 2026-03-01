@@ -275,6 +275,7 @@ dependencies = [
 name = "devflow-cli"
 version = "0.2.0"
 dependencies = [
+ "anstyle",
  "anyhow",
  "clap",
  "devflow-core",
