@@ -62,7 +62,7 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
 
         // When IS_CONTAINER=true (e.g., inside GHA native container: job),
         // skip the docker-run proxy even if profile is "container".
-        // This matches the kroki-rs pattern for native container execution.
+        // This enables GHA native container jobs to run dwf commands directly.
         let is_already_in_container = std::env::var("IS_CONTAINER")
             .map(|v| v == "true")
             .unwrap_or(false);
