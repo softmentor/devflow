@@ -3,7 +3,7 @@ name = "devflow"
 stack = ["rust"]
 
 [runtime]
-profile = "container"
+profile = "host"
 
 [container]
 image = "devflow-ci"
