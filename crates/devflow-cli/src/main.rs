@@ -15,7 +15,33 @@ mod init;
 /// The command-line interface for Devflow.
 #[derive(Debug, Parser)]
 #[command(name = "dwf")]
+#[command(version)]
 #[command(about = "Devflow CLI - Modern developer workflow automation")]
+#[command(long_about = r#"
+Devflow is a high-performance developer workflow engine designed for consistency 
+between local development and CI environments. It uses a container-first 
+approach to ensure that "it works on my machine" means "it works in CI".
+
+Common Commands:
+  check:pr          Run the PR verification policy (fmt, lint, build, test)
+  ci:generate       Generate or update the GitHub Actions workflow
+  fmt:check         Check code formatting
+  fmt:fix           Fix code formatting
+  lint:static       Run static analysis (clippy, eslint, etc.)
+  build:debug       Perform a debug build
+  test:unit         Run unit tests
+  init              Initialize a new devflow.toml in the current directory
+"#)]
+#[command(after_help = r#"
+Examples:
+  dwf check pr              # Run all PR checks (shorthand)
+  dwf fmt fix               # Fix formatting across the project
+  dwf test unit             # Run unit tests only
+  dwf ci:generate           # Update .github/workflows/ci.yml
+  dwf init                  # Bootstrap a new project
+
+GitHub Repository: https://github.com/softmentor/devflow
+"#)]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,
