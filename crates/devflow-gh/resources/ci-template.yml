@@ -108,6 +108,11 @@ jobs:
           key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-v3-${{ runner.os }}-
 
+      - name: Prep Cache Directories
+        run: |
+          mkdir -p .cargo-cache/registry .cargo-cache/git .cargo-cache/sccache target/ci
+          sudo chmod -R 777 .cargo-cache target/ci
+
       - name: Bootstrap & Warm Cache
         run: |
           docker run --rm \
@@ -123,8 +128,8 @@ jobs:
       - name: Fix Cache Permissions
         if: always()
         run: |
-          sudo chown -R $USER:$USER .cargo-cache target/ci || true
-          sudo chmod -R a+rw .cargo-cache target/ci || true
+          sudo chown -R $(id -u):$(id -g) .cargo-cache target/ci || true
+          sudo chmod -R 777 .cargo-cache target/ci || true
 
   # ---------------------------------------------------------------------------
   # Phase 3 — Verify: sequential checks inside the same container instance
@@ -158,6 +163,11 @@ jobs:
             target/ci
           key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-v3-${{ runner.os }}-
+
+      - name: Prep Cache Directories
+        run: |
+          mkdir -p .cargo-cache/registry .cargo-cache/git .cargo-cache/sccache target/ci
+          sudo chmod -R 777 .cargo-cache target/ci
 
       - name: Bootstrap Devflow
         run: |
@@ -193,6 +203,6 @@ jobs:
       - name: Fix Cache Permissions
         if: always()
         run: |
-          sudo chown -R $USER:$USER .cargo-cache target/ci || true
-          sudo chmod -R a+rw .cargo-cache target/ci || true
+          sudo chown -R $(id -u):$(id -g) .cargo-cache target/ci || true
+          sudo chmod -R 777 .cargo-cache target/ci || true
 # project: {{PROJECT_NAME}}

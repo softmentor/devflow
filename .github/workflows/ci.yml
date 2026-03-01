@@ -38,11 +38,9 @@ jobs:
 
       - name: Cache CI Image Tar
         if: steps.check.outputs.available == 'true'
-        id: image_cache
-        uses: actions/cache@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Build CI Image (Buildx)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -56,12 +54,26 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      - name: Trivy Vulnerability Scan
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devflow-ci:latest
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
         run: |
           docker save -o ci-image.tar devflow-ci:latest
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
+
+      - name: Ensure Cache Paths Exist
+        if: steps.check.outputs.available == 'true'
+        run: |
+          touch ci-image.tar
+          mkdir -p /tmp/.buildx-cache
 
   # ---------------------------------------------------------------------------
   # Phase 2 — Build: warm the cargo/sccache cache inside the CI container
@@ -79,7 +91,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Load CI Image
         if: needs.prep.outputs.image_available == 'true'
@@ -93,8 +105,13 @@ jobs:
             .cargo-cache/git
             .cargo-cache/sccache
             target/ci
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-v3-${{ runner.os }}-
+
+      - name: Prep Cache Directories
+        run: |
+          mkdir -p .cargo-cache/registry .cargo-cache/git .cargo-cache/sccache target/ci
+          sudo chmod -R 777 .cargo-cache target/ci
 
       - name: Bootstrap & Warm Cache
         run: |
@@ -110,7 +127,9 @@ jobs:
 
       - name: Fix Cache Permissions
         if: always()
-        run: sudo chmod -R a+rw .cargo-cache target/ci || true
+        run: |
+          sudo chown -R $(id -u):$(id -g) .cargo-cache target/ci || true
+          sudo chmod -R 777 .cargo-cache target/ci || true
 
   # ---------------------------------------------------------------------------
   # Phase 3 — Verify: sequential checks inside the same container instance
@@ -128,7 +147,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ci-image.tar
-          key: docker-ci-${{ hashFiles('Dockerfile.devflow') }}
+          key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
 
       - name: Load CI Image
         if: needs.prep.outputs.image_available == 'true'
@@ -142,8 +161,13 @@ jobs:
             .cargo-cache/git
             .cargo-cache/sccache
             target/ci
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-v3-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-v3-${{ runner.os }}-
+
+      - name: Prep Cache Directories
+        run: |
+          mkdir -p .cargo-cache/registry .cargo-cache/git .cargo-cache/sccache target/ci
+          sudo chmod -R 777 .cargo-cache target/ci
 
       - name: Bootstrap Devflow
         run: |
@@ -167,11 +191,18 @@ jobs:
             -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
             -e RUSTC_WRAPPER=sccache \
             -e IS_CONTAINER=true \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e GITHUB_REPOSITORY=${{ github.repository }} \
+            -e GITHUB_SHA=${{ github.sha }} \
+            -e GITHUB_HEAD_SHA=${{ github.event.pull_request.head.sha }} \
+            -e GITHUB_RUN_ID=${{ github.run_id }} \
             -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             devflow-ci:latest \
-            sh -c "dwf fmt:check && dwf lint:static && dwf build:debug && dwf test:unit && dwf test:integration"
+            sh -c "pids=(); dwf --report fmt-check fmt:check & pids+=($!); dwf --report lint-static lint:static & pids+=($!); dwf --report build-debug build:debug & pids+=($!); dwf --report test-unit test:unit & pids+=($!); dwf --report test-integration test:integration & pids+=($!); exit_code=0; for pid in ${pids[@]}; do wait $pid || exit_code=$?; done; exit $exit_code"
 
       - name: Fix Cache Permissions
         if: always()
-        run: sudo chmod -R a+rw .cargo-cache target/ci || true
+        run: |
+          sudo chown -R $(id -u):$(id -g) .cargo-cache target/ci || true
+          sudo chmod -R 777 .cargo-cache target/ci || true
 # project: devflow
