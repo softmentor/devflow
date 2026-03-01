@@ -86,6 +86,7 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
     ExecutionAction {
         program: program.to_string(),
         args: args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
     }
 }
 

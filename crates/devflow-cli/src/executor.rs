@@ -119,12 +119,14 @@ fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
         return Some(ExecutionAction {
             program: "just".to_string(),
             args: vec![target],
+            env: std::collections::HashMap::new(),
         });
     }
     if Path::new("Makefile").exists() {
         return Some(ExecutionAction {
             program: "make".to_string(),
             args: vec![target],
+            env: std::collections::HashMap::new(),
         });
     }
 
@@ -132,6 +134,7 @@ fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
         (PrimaryCommand::Setup, "doctor") => Some(ExecutionAction {
             program: "echo".to_string(),
             args: vec!["custom stack requires justfile or Makefile targets".to_string()],
+            env: std::collections::HashMap::new(),
         }),
         _ => None,
     }
@@ -183,10 +186,9 @@ fn build_container_proxy(
         .and_then(|c| c.image.clone())
         .unwrap_or_else(|| DEFAULT_CI_IMAGE.to_string());
 
-    let dwf_cache_root = cfg
-        .cache
-        .as_ref()
-        .and_then(|c| c.root.clone())
+    let dwf_cache_root = std::env::var("DWF_CACHE_ROOT")
+        .ok()
+        .or_else(|| cfg.cache.as_ref().and_then(|c| c.root.clone()))
         .unwrap_or_else(|| DEFAULT_CACHE_ROOT.to_string());
 
     let cwd = std::env::current_dir()?;
@@ -211,7 +213,7 @@ fn build_container_proxy(
 
     // Cache redirection: extensions define relative paths (e.g. ".cargo") which
     // we anchor to the unified `DWF_CACHE_ROOT` on the host.
-    let abs_cache_root = resolve_cache_root(&cwd, &dwf_cache_root);
+    let abs_cache_root = resolve_cache_root(cfg, &dwf_cache_root);
     let mounts = registry.all_cache_mounts();
 
     for mount in mounts {
@@ -233,6 +235,11 @@ fn build_container_proxy(
         }
     }
 
+    for (key, value) in &action.env {
+        args.push("-e".to_string());
+        args.push(format!("{}={}", key, value));
+    }
+
     args.push(image);
     args.push(action.program.clone());
     args.extend(action.args.clone());
@@ -240,6 +247,7 @@ fn build_container_proxy(
     Ok(ExecutionAction {
         program: engine_cmd,
         args,
+        env: action.env.clone(),
     })
 }
 
@@ -265,8 +273,20 @@ fn resolve_engine(engine_cfg: ContainerEngine) -> Result<String> {
     Ok(cmd.to_string())
 }
 
-fn resolve_cache_root(cwd: &Path, root: &str) -> PathBuf {
-    std::fs::canonicalize(root).unwrap_or_else(|_| cwd.join(root))
+fn resolve_cache_root(cfg: &DevflowConfig, root: &str) -> PathBuf {
+    let path = PathBuf::from(root);
+    if path.is_absolute() {
+        return path;
+    }
+
+    let source_dir = cfg.source_dir.as_deref().unwrap_or_else(|| Path::new("."));
+    let abs_source = if source_dir.is_absolute() {
+        source_dir.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(source_dir)
+    };
+
+    abs_source.join(root)
 }
 
 fn parse_mount(mount: &str) -> Option<(&str, &str)> {
@@ -327,6 +347,7 @@ mod tests {
         let action = ExecutionAction {
             program: "echo".to_string(),
             args: vec!["hello".to_string(), "world".to_string()],
+            env: std::collections::HashMap::new(),
         };
         // Should succeed without error
         assert!(run_action(&action).is_ok());
@@ -337,6 +358,7 @@ mod tests {
         let action = ExecutionAction {
             program: "false".to_string(), // Typical unix command that always fails
             args: vec![],
+            env: std::collections::HashMap::new(),
         };
         let result = run_action(&action);
         assert!(result.is_err());
@@ -351,6 +373,7 @@ mod tests {
         let action = ExecutionAction {
             program: "this-program-definitely-does-not-exist-123".to_string(),
             args: vec![],
+            env: std::collections::HashMap::new(),
         };
         let result = run_action(&action);
         assert!(result.is_err());
