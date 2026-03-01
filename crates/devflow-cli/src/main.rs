@@ -487,6 +487,9 @@ mod tests {
             ci_output: ci_output.to_string(),
             force: false,
             report: None,
+            local: false,
+            gh: false,
+            all: false,
         }
     }
 
