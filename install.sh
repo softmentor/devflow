@@ -115,27 +115,30 @@ ensure_path_persisted() {
 # ---------------------------------------------------------------------------
 LOCAL_RELEASE="${ROOT_DIR}/target/release/dwf"
 LOCAL_DEBUG="${ROOT_DIR}/target/debug/dwf"
+SELECTED_LOCAL=""
 
-if [ -x "${LOCAL_RELEASE}" ]; then
-    log "found local release build: ${LOCAL_RELEASE}"
-    log "installing to ${TARGET_BIN}"
-    mkdir -p "${INSTALL_DIR}"
-    cp "${LOCAL_RELEASE}" "${TARGET_BIN}"
-    chmod +x "${TARGET_BIN}"
-    ensure_path_persisted
-
-    log "done (from local release build)"
-    log "binary: ${TARGET_BIN}"
-    exit 0
+if [ -x "${LOCAL_RELEASE}" ] && [ -x "${LOCAL_DEBUG}" ]; then
+    if [ "${LOCAL_RELEASE}" -nt "${LOCAL_DEBUG}" ]; then
+        SELECTED_LOCAL="${LOCAL_RELEASE}"
+        log "found local release and debug builds; release is newer"
+    else
+        SELECTED_LOCAL="${LOCAL_DEBUG}"
+        log "found local release and debug builds; debug is newer"
+    fi
+elif [ -x "${LOCAL_RELEASE}" ]; then
+    SELECTED_LOCAL="${LOCAL_RELEASE}"
 elif [ -x "${LOCAL_DEBUG}" ]; then
-    log "found local debug build: ${LOCAL_DEBUG}"
-    log "installing to ${TARGET_BIN}"
+    SELECTED_LOCAL="${LOCAL_DEBUG}"
+fi
+
+if [ -n "${SELECTED_LOCAL}" ]; then
+    log "installing from local build: ${SELECTED_LOCAL}"
     mkdir -p "${INSTALL_DIR}"
-    cp "${LOCAL_DEBUG}" "${TARGET_BIN}"
+    cp "${SELECTED_LOCAL}" "${TARGET_BIN}"
     chmod +x "${TARGET_BIN}"
     ensure_path_persisted
 
-    log "done (from local debug build)"
+    log "done (from local build)"
     log "binary: ${TARGET_BIN}"
     exit 0
 fi
