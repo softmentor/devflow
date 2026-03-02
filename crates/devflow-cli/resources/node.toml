@@ -8,6 +8,7 @@ profile = "auto"
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
 main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
+security = ["check:security"]
 
 [extensions.node]
 source = "builtin"
@@ -17,4 +18,3 @@ required = true
 # You can customize this base image via Dockerfile.devflow
 image = "my-node-project-ci:latest"
 engine = "auto"
-

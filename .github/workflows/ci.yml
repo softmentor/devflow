@@ -1,6 +1,12 @@
 name: ci
 
-on: [pull_request, push]
+on:
+  pull_request:
+  push:
+    branches: [main, dev, rel/*]
+    tags: ['v*']
+  schedule:
+    - cron: '0 0 * * *' # Nightly scans
 permissions:
   contents: read
 

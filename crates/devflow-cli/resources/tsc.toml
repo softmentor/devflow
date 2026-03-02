@@ -8,6 +8,7 @@ profile = "auto"
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit"]
 main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
+security = ["check:security"]
 
 [extensions.node]
 source = "builtin"
