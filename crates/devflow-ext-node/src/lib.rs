@@ -5,6 +5,7 @@
 //! into the Devflow ecosystem.
 
 use devflow_core::{CommandRef, ExecutionAction, Extension};
+use anyhow::Result;
 use std::collections::HashSet;
 
 /// The Devflow extension for Node.js.
@@ -47,11 +48,11 @@ impl Extension for NodeExtension {
         .collect()
     }
 
-    fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction> {
+    fn build_action(&self, cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
         let primary = cmd.primary.as_str();
         let selector = cmd.selector.as_deref().unwrap_or("");
 
-        match (primary, selector) {
+        let action = match (primary, selector) {
             ("setup", "deps") => Some(action("npm", &["ci"])),
             ("setup", "doctor") => Some(action("npm", &["--version"])),
             ("fmt", "check") => Some(action("npm", &["run", "fmt:check"])),
@@ -64,7 +65,12 @@ impl Extension for NodeExtension {
             ("test", "smoke") => Some(action("npm", &["run", "test:smoke"])),
             ("package", "artifact") => Some(action("npm", &["pack", "--dry-run"])),
             _ => None,
-        }
+        };
+        Ok(action)
+    }
+
+    fn is_trusted(&self) -> bool {
+        true
     }
 
     fn cache_mounts(&self) -> Vec<String> {

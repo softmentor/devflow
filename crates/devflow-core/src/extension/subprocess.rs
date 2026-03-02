@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use anyhow::Result;
 use tracing::{debug, error};
 
 use crate::command::CommandRef;
@@ -13,15 +14,22 @@ pub struct SubprocessExtension {
     name: String,
     binary_path: String,
     capabilities: HashSet<String>,
+    is_trusted: bool,
 }
 
 impl SubprocessExtension {
     /// Creates a new `SubprocessExtension`.
-    pub fn new(name: String, binary_path: String, capabilities: HashSet<String>) -> Self {
+    pub fn new(
+        name: String,
+        binary_path: String,
+        capabilities: HashSet<String>,
+        is_trusted: bool,
+    ) -> Self {
         Self {
             name,
             binary_path,
             capabilities,
+            is_trusted,
         }
     }
 }
@@ -35,14 +43,9 @@ impl Extension for SubprocessExtension {
         self.capabilities.clone()
     }
 
-    fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction> {
-        let serialized_cmd = match serde_json::to_string(cmd) {
-            Ok(json) => json,
-            Err(e) => {
-                error!("failed to serialize command for {}: {}", self.name, e);
-                return None;
-            }
-        };
+    fn build_action(&self, cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
+        let serialized_cmd = serde_json::to_string(cmd)
+            .map_err(|e| anyhow::anyhow!("failed to serialize command for {}: {}", self.name, e))?;
 
         let mut child = match Command::new(&self.binary_path)
             .arg("--build-action")
@@ -57,14 +60,14 @@ impl Extension for SubprocessExtension {
                     "failed to spawn extension binary '{}': {}",
                     self.binary_path, e
                 );
-                return None;
+                return Ok(None);
             }
         };
 
         if let Some(mut stdin) = child.stdin.take() {
             if let Err(e) = stdin.write_all(serialized_cmd.as_bytes()) {
                 error!("failed to write to extension stdin: {}", e);
-                return None;
+                return Ok(None);
             }
         }
 
@@ -72,7 +75,7 @@ impl Extension for SubprocessExtension {
             Ok(out) => out,
             Err(e) => {
                 error!("failed to read from extension stdout: {}", e);
-                return None;
+                return Ok(None);
             }
         };
 
@@ -82,16 +85,17 @@ impl Extension for SubprocessExtension {
                 self.name,
                 cmd.canonical()
             );
-            return None;
+            return Ok(None);
         }
 
-        match serde_json::from_slice::<ExecutionAction>(&output.stdout) {
-            Ok(action) => Some(action),
-            Err(e) => {
-                error!("failed to parse ExecutionAction from {}: {}", self.name, e);
-                None
-            }
-        }
+        let action = serde_json::from_slice::<ExecutionAction>(&output.stdout)
+            .map_err(|e| anyhow::anyhow!("failed to parse ExecutionAction from {}: {}", self.name, e))?;
+        
+        Ok(Some(action))
+    }
+
+    fn is_trusted(&self) -> bool {
+        self.is_trusted
     }
 }
 
@@ -136,6 +140,7 @@ if "--build-action" in sys.argv:
             "mock".to_string(),
             binary_path,
             HashSet::from(["test".to_string()]),
+            true,
         );
 
         let cmd = CommandRef {
@@ -143,7 +148,7 @@ if "--build-action" in sys.argv:
             selector: None,
         };
 
-        let action = ext.build_action(&cmd).expect("should return action");
+        let action = ext.build_action(&cmd).expect("RPC failed").expect("should return action");
         assert_eq!(action.program, "echo");
         assert_eq!(action.args, vec!["mock-test".to_string()]);
     }
@@ -157,6 +162,7 @@ if "--build-action" in sys.argv:
             "mock".to_string(),
             binary_path,
             HashSet::from(["test".to_string()]),
+            true,
         );
 
         // Our python script exits with 1 for non-test commands
@@ -165,7 +171,7 @@ if "--build-action" in sys.argv:
             selector: None,
         };
 
-        let action = ext.build_action(&cmd);
+        let action = ext.build_action(&cmd).expect("RPC failed");
         assert!(action.is_none());
     }
 }

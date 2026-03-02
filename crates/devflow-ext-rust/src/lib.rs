@@ -5,7 +5,8 @@
 //! into the Devflow ecosystem.
 
 use devflow_core::{CommandRef, ExecutionAction, Extension};
-use std::collections::HashSet;
+use anyhow::Result;
+use std::collections::{HashMap, HashSet};
 
 /// The Devflow extension for Rust.
 ///
@@ -49,11 +50,11 @@ impl Extension for RustExtension {
         .collect()
     }
 
-    fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction> {
+    fn build_action(&self, cmd: &CommandRef) -> anyhow::Result<Option<ExecutionAction>> {
         let primary = cmd.primary.as_str();
         let selector = cmd.selector.as_deref().unwrap_or("");
 
-        match (primary, selector) {
+        let action = match (primary, selector) {
             ("setup", "toolchain") => Some(action("rustup", &["show"])),
             ("setup", "deps") => Some(action("cargo", &["fetch"])),
             ("setup", "doctor") => Some(action("cargo", &["--version"])),
@@ -89,7 +90,12 @@ impl Extension for RustExtension {
             ("package", "artifact") => Some(action("cargo", &["build", "--release"])),
             ("release", "candidate") => Some(action("cargo", &["build", "--release"])),
             _ => None,
-        }
+        };
+        Ok(action)
+    }
+
+    fn is_trusted(&self) -> bool {
+        true
     }
 
     fn cache_mounts(&self) -> Vec<String> {

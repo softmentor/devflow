@@ -49,7 +49,29 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
 
     for stack in &requested_stacks {
         let effective = with_default_selector(command);
-        let Some(action) = map_command(stack, &effective, registry) else {
+        
+        let is_already_in_container = std::env::var("IS_CONTAINER")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
+        let action_result = if cfg.runtime.profile == RuntimeProfile::Container && !is_already_in_container {
+             // If we are in container mode, check if the extension is trusted to run on host
+             if let Some(ext) = registry.get(stack) {
+                 if ext.is_trusted() {
+                     map_command(stack, &effective, registry)
+                 } else {
+                     // UNTRUSTED negotiation: we must run build_action inside a container
+                     // For now, we bail with a helpful message until the full Pre-Flight container is wired
+                     bail!("untrusted extension '{}' cannot negotiate on host in container mode. Move to trusted = true or wait for Pre-Flight jail support.", stack);
+                 }
+             } else {
+                 map_command(stack, &effective, registry)
+             }
+        } else {
+            map_command(stack, &effective, registry)
+        };
+
+        let Some(action) = action_result? else {
             info!(target: "devflow",
                 "skip {}: unsupported command {}",
                 stack,
@@ -112,9 +134,9 @@ fn map_command(
     stack: &str,
     cmd: &CommandRef,
     registry: &ExtensionRegistry,
-) -> Option<ExecutionAction> {
+) -> Result<Option<ExecutionAction>> {
     match stack {
-        "custom" => map_custom(cmd),
+        "custom" => Ok(map_custom(cmd)),
         _ => registry.build_action(stack, cmd),
     }
 }
