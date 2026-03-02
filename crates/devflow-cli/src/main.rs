@@ -61,12 +61,14 @@ pub(crate) struct Cli {
 }
 
 fn main() -> Result<()> {
+    eprintln!("[debug] starting dwf...");
     let format = fmt::format()
         .with_target(false)
         .with_level(true)
         .with_timer(fmt::time::uptime())
         .compact();
 
+    eprintln!("[debug] initializing tracing...");
     tracing_subscriber::registry()
         .with(
             fmt::layer()
@@ -76,15 +78,19 @@ fn main() -> Result<()> {
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
+    eprintln!("[debug] parsing arguments...");
     let cli = Cli::parse();
     debug!("parsed cli arguments: {:?}", cli);
 
+    eprintln!("[debug] processing command...");
     let command_name = match &cli.command {
         Some(cmd) => cmd,
         None => {
             use clap::CommandFactory;
+            eprintln!("[debug] printing help...");
             Cli::command().print_help()?;
             println!(); // Add a newline after help
+            eprintln!("[debug] help printed.");
             return Ok(());
         }
     };

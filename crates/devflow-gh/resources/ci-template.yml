@@ -57,15 +57,19 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      - name: Install Trivy
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/setup-trivy@v0.2.2
+        with:
+          cache: true
+
       - name: Generate Trivy Vulnerability Report (JSON)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'json'
-          output: 'trivy-report.json'
-          exit-code: 0
+        run: |
+          trivy fs . \
+            --format json \
+            --output trivy-report.json \
+            --exit-code 0
 
       - name: Upload Vulnerability Scan Results
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -75,17 +79,14 @@ jobs:
           path: trivy-report.json
           retention-days: 30
 
-      - name: Fail build on High/CRITICAL Vulnerabilities
+      - name: Fail build on HIGH/CRITICAL Vulnerabilities
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true
-          exit-code: 1
-          skip-setup-trivy: true
+        run: |
+          trivy fs . \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format table \
+            --exit-code 1
 
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'

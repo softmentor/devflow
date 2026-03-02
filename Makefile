@@ -137,3 +137,9 @@ teardown:
 		docker volume prune -f; \
 	fi
 	@echo "✨ Teardown complete."
+
+clean-all: clean teardown
+	@echo "🧹 Removing target directory and local binary..."
+	rm -rf target
+	rm -f $(HOME)/.local/bin/dwf
+	@echo "✨ Clean-all complete."
