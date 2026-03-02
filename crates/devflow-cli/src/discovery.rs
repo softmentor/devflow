@@ -22,7 +22,7 @@ fn discover_and_register(
     registry: &mut ExtensionRegistry,
     is_trusted: bool,
 ) {
-    debug!("probing for subprocess extension: {}", binary_name);
+    debug!("probing for subprocess extension: {}", ext_name);
 
     let output = match Command::new(&binary_name).arg("--discover").output() {
         Ok(out) => out,
