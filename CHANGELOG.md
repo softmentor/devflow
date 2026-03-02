@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI environment alignment by switching to `/bin/bash` for robust parallel execution tracking in `ci-template.yml`.
 - Dependency installation reliability in CI by pinning `aquasecurity/setup-trivy` to the stable `v0.2.5` release.
 - CI environment variable parsing via localized quoting in `docker run` invocations.
+- Host runtime execution now applies extension-provided environment variables from `ExecutionAction.env`.
+- Generated CI cache-hit gating now correctly binds to `steps.image_cache.outputs.cache-hit`.
+
+### Security
+- Implicitly discovered subprocess extensions (`devflow-ext-*` on `$PATH`) now default to `trusted = false`.
+- Extensions must opt in with `[extensions.<name>] trusted = true` to negotiate on host while running with `runtime.profile = "container"`.
 
 ## [0.1.0] - 2026-02-15
 

@@ -56,7 +56,8 @@ For projects involving multiple language toolchains (e.g., Rust + Node.js), Devf
 
 ### Subprocess Extensions (e.g., Python-ext)
 Devflow encourages a "Security-by-Isolation" model for extensions:
-- **Sandbox Boundary**: When an extension is executed via `dwf`, it runs inside the same hardened container as the main project.
+- **Trust Gate**: Subprocess extensions are untrusted by default and must explicitly opt in (`trusted = true`) for host negotiation in container profile.
+- **Sandbox Boundary**: Command execution still runs inside the hardened container boundary after negotiation.
 - **Protocol Security**: Communication between Devflow and the subprocess occurs over standard I/O (JSON-RPC), avoiding the need for network sockets or elevated privileges.
 - **Runtime Hardening**: Python-based extensions leverage dedicated `pip` cache mounts and a non-root environment, preventing extension-based supply chain attacks from escalating to the host.
 

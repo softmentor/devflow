@@ -91,12 +91,13 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
             .map(|v| v == "true")
             .unwrap_or(false);
 
-        let final_action =
-            if cfg.runtime.profile == RuntimeProfile::Container && !is_already_in_container {
-                build_container_proxy(cfg, registry, &action)?
-            } else {
-                action
-            };
+        let use_container_proxy =
+            cfg.runtime.profile == RuntimeProfile::Container && !is_already_in_container;
+        let final_action = if use_container_proxy {
+            build_container_proxy(cfg, registry, &action)?
+        } else {
+            sanitize_host_env(action)
+        };
 
         info!(target: "devflow", "run {} on {}", effective, stack);
         run_action(&final_action)
@@ -111,6 +112,31 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
     }
 
     Ok(())
+}
+
+/// Removes container-bound env values when running directly on host.
+///
+/// Extensions may return envs like `/workspace/...` or `/root/...` for container parity.
+/// In host profile these paths are often invalid or read-only and can break local execution.
+fn sanitize_host_env(mut action: ExecutionAction) -> ExecutionAction {
+    action.env.retain(|key, value| {
+        if matches!(
+            key.as_str(),
+            "CARGO_HOME"
+                | "CARGO_TARGET_DIR"
+                | "SCCACHE_DIR"
+                | "RUSTC_WRAPPER"
+                | "NPM_CONFIG_CACHE"
+        ) {
+            return false;
+        }
+
+        !(value == "/workspace"
+            || value.starts_with("/workspace/")
+            || value == "/root"
+            || value.starts_with("/root/"))
+    });
+    action
 }
 
 /// Normalizes a command by applying default selectors if missing.
@@ -176,6 +202,7 @@ fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
 fn run_action(action: &ExecutionAction) -> Result<()> {
     let status = Command::new(&action.program)
         .args(&action.args)
+        .envs(action.env.iter())
         .status()
         .with_context(|| {
             format!(
@@ -429,5 +456,28 @@ mod tests {
         };
         let result = run_action(&action);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn host_env_sanitizer_drops_container_paths() {
+        let mut env = std::collections::HashMap::new();
+        env.insert(
+            "CARGO_HOME".to_string(),
+            "/workspace/.cargo-cache".to_string(),
+        );
+        env.insert("NPM_CONFIG_CACHE".to_string(), "/root/.npm".to_string());
+        env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+        env.insert("CI".to_string(), "true".to_string());
+
+        let out = sanitize_host_env(ExecutionAction {
+            program: "echo".to_string(),
+            args: vec!["ok".to_string()],
+            env,
+        });
+
+        assert!(!out.env.contains_key("CARGO_HOME"));
+        assert!(!out.env.contains_key("NPM_CONFIG_CACHE"));
+        assert!(!out.env.contains_key("RUSTC_WRAPPER"));
+        assert_eq!(out.env.get("CI").map(String::as_str), Some("true"));
     }
 }
