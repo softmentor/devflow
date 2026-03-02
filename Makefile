@@ -134,18 +134,28 @@ scan:
 	fi
 
 # Tearing down Devflow environment
-teardown:
+teardown: clean clean-examples
 	@echo "🧹 Tearing down Devflow environment..."
 	rm -rf .cargo-cache target/ci ci-image.tar
 	@echo "🐳 Pruning container state..."
 	@if command -v podman >/dev/null 2>&1; then \
-		podman system prune -f; \
+		podman system prune -a -f; \
 		podman volume prune -f; \
 	elif command -v docker >/dev/null 2>&1; then \
-		docker system prune -f; \
+		docker system prune -a -f; \
 		docker volume prune -f; \
 	fi
 	@echo "✨ Teardown complete."
+
+# Helper to clean all example projects
+clean-examples:
+	@echo "🧹 Cleaning all example projects..."
+	@for dir in examples/*/ ; do \
+		if [ -f "$$dir/Makefile" ]; then \
+			echo "Cleaning $$dir..."; \
+			$(MAKE) -C $$dir clean; \
+		fi; \
+	done
 
 # GitHub Repository Settings management via Terraform
 gh-setup:

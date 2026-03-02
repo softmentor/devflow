@@ -8,3 +8,7 @@ test-unit:
 	@echo "custom test-unit from makefile"
 test-integration:
 	@echo "custom test-integration from makefile"
+
+clean:
+	@echo "Cleaning python-ext..."
+	rm -rf __pycache__ .pytest_cache
