@@ -67,3 +67,13 @@ To maintain professional-grade security, Devflow images follow a "Hardened by De
 *   **Non-Root Execution**: Containers run as a dedicated `dwfuser` (UID 1001), preventing privilege escalation inside the build environment.
 *   **Init Process**: All images utilize `tini` as `ENTRYPOINT` for reliable signal forwarding.
 *   **Vulnerability Gates**: CI pipelines include automated **Trivy** scanning. Builds are blocked if the CI image contains `CRITICAL` or `HIGH` severity vulnerabilities.
+
+## 7. Process Stability and Shell Semantics
+
+### The Bash Requirement
+While Devflow core remains shell-agnostic, the generated GitHub Actions workflows utilize `/bin/bash` for their execution environment. This is a deliberate choice to support:
+- **Parallel Process Tracking**: Bash-specific array syntax (`pids=()`) is used to monitor background checks and accumulate asynchronous exit codes reliably.
+- **Signal Forwarding**: Bash provides more robust handling of sub-processes when combined with `tini` as an init wrapper.
+
+### Reliable Termination
+To prevent "zombie" processes or CLI hangs during shutdown (especially when help is printed), `devflow-cli` implements an explicit `std::process::exit(0)` immediately after printing help. This ensures that any background threads or file handles are forcibly closed by the OS, providing an instant return to the user prompt.

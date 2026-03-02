@@ -26,10 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - QEMU architecture mismatches by dynamically detecting host architecture for CI toolchain downloads.
-- CLI hangs (SIGKILL 137) by adding explicit `std::process::exit(0)` and removing conflicting ANSI escape codes.
-- CI shell syntax errors (`sh: 1: Syntax error`) by switching the execution shell from `sh` to `/bin/bash` in `ci-template.yml`.
-- Trivy installation errors in CI by pinning `aquasecurity/setup-trivy` to `v0.2.5`.
-- Environment variable parsing issues in CI via universal quoting in `docker run` commands.
+- CLI process hygiene by adding explicit termination guards and removing conflicting styling attributes.
+- CI environment alignment by switching to `/bin/bash` for robust parallel execution tracking in `ci-template.yml`.
+- Dependency installation reliability in CI by pinning `aquasecurity/setup-trivy` to the stable `v0.2.5` release.
+- CI environment variable parsing via localized quoting in `docker run` invocations.
 
 ## [0.1.0] - 2026-02-15
 

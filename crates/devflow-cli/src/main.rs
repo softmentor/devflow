@@ -23,16 +23,15 @@ use styles as s;
 #[command(name = "dwf")]
 #[command(version)]
 #[command(styles = s::get_clap_styles())]
-#[command(
-    help_template = "\
+#[command(help_template = "\
 {bin} {version}
 {about}
 
-Usage: {usage}
+Usage: dwf [COMMAND] [SELECTOR] [OPTIONS]
 
 Arguments:
-  [COMMAND]   Primary command (e.g., init, check, test, ci, prune)
-  [SELECTOR]  Specific behavior (e.g., pr, security, unit, generate)
+  [COMMAND]   Command name or canonical form (e.g., `check`, `check:pr`)
+  [SELECTOR]  Optional selector if COMMAND is just a name (e.g., `pr`)
 
 Options:
 {options}
@@ -62,8 +61,7 @@ Examples:
   dwf prune:cache --all        # Prune all caches
 
 Documentation: https://github.com/softmentor/devflow
-"
-)]
+")]
 #[command(about = "Modern developer workflow automation")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
