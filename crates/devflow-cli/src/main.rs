@@ -189,9 +189,9 @@ fn report_status(
     });
 
     let resp = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {}", token))
-        .set("Accept", "application/vnd.github+json")
-        .set("X-GitHub-Api-Version", "2022-11-28")
+        .header("Authorization", &format!("Bearer {}", token))
+        .header("Accept", "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
         .send_json(body);
 
     match resp {
