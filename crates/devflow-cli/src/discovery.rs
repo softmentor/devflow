@@ -27,15 +27,15 @@ fn discover_and_register(
     let output = match Command::new(&binary_name).arg("--discover").output() {
         Ok(out) => out,
         Err(e) => {
-            debug!("failed to find or execute '{}': {}", binary_name, e);
+            debug!("failed to find or execute extension '{}': {}", ext_name, e);
             return;
         }
     };
 
     if !output.status.success() {
         warn!(
-            "{} --discover failed with status {}",
-            binary_name, output.status
+            "extension '{}' --discover failed with status {}",
+            ext_name, output.status
         );
         return;
     }
@@ -43,14 +43,15 @@ fn discover_and_register(
     let capabilities: HashSet<String> = match serde_json::from_slice(&output.stdout) {
         Ok(caps) => caps,
         Err(e) => {
-            warn!("failed to parse capabilities from {}: {}", binary_name, e);
+            warn!("failed to parse capabilities for extension '{}': {}", ext_name, e);
             return;
         }
     };
 
     debug!(
-        "discovered subprocess extension '{}' with capabilities: {:?}",
-        ext_name, capabilities
+        "discovered subprocess extension '{}' with {} capabilities",
+        ext_name,
+        capabilities.len()
     );
 
     let ext = SubprocessExtension::new(ext_name, binary_name, capabilities, is_trusted);

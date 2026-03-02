@@ -18,7 +18,7 @@ By the end of this page you will:
 
 ## Step 1: Install Devflow
 
-Follow [Installation](#devflow.user-guide.installation).
+Follow [Installation](installation.md).
 
 ## Step 2: Initialize Project Config and Starter CI
 
