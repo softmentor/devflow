@@ -1,0 +1,33 @@
+# Devflow Node.js container blueprint
+# 2025 Best Practices: Non-root, Tini, BuildKit Cache Mounts
+
+FROM node:22.14.0-slim AS base
+LABEL org.opencontainers.image.description="Devflow Node Base (Debian Slim + Tini)"
+
+# Install system dependencies with cache mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    python3 \
+    tini \
+    ca-certificates \
+    --no-install-recommends
+
+# Setup non-root user (UID 1001)
+RUN groupadd -g 1001 dwfgroup && \
+    useradd -u 1001 -g dwfgroup -m -s /bin/bash dwfuser
+
+WORKDIR /workspace
+
+# Set ownership and switch to non-root user
+RUN chown -R dwfuser:dwfgroup /workspace
+USER dwfuser
+
+# Use cache mount for npm cache
+ENV npm_config_cache=/home/dwfuser/.npm
+RUN mkdir -p /home/dwfuser/.npm
+
+ENTRYPOINT ["/usr/bin/tini", "--"]

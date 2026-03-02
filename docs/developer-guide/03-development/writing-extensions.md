@@ -83,6 +83,11 @@ if "--build-action" in sys.argv:
    `{"program": "flake8", "args": ["."]}`
 4. **Integration Test with Devflow**: Once the CLI commands output correct JSON, you can run Devflow on any project and it will immediately delegate execution to your binary!
 
+## Container Profile Trust Setting
+
+If your project uses `runtime.profile = "container"`, subprocess extensions should be explicitly configured under `[extensions.<name>]`.
+Set `trusted = true` only when host-side negotiation is intended and approved.
+
 ## Examples
 
 We provide sample implementations of this protocol to guide your development:

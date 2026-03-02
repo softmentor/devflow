@@ -75,8 +75,9 @@ flowchart LR
 
 Architecture constraints:
 
-- `devflow-core` is stack-agnostic.
-- Stack-specific logic lives in `devflow-ext-*`.
+- `devflow-core` is fundamentally stack-agnostic. It coordinates executors but has zero knowledge of toolchains.
+- `devflow-cli` is also stack-agnostic. It blindly maps arguments and volume mounts to container/host engines without interpreting them.
+- Stack-specific logic lives strictly inside the `devflow-ext-*` extensions (e.g., `.cargo` paths, or `cargo nextest` aliases).
 - CI YAML orchestrates only; command semantics stay in `devflow`.
 
 ## 4. Workspace Structure (Target)
@@ -209,29 +210,27 @@ Execution model:
 
 Runtime profile policy:
 
-- `container`: default for CI and recommended for reproducibility.
+- `container`: default for CI and recommended for reproducibility. The executor translates generic volumes and commands into a seamless container instance proxy.
 - `host`: allowed when projects explicitly opt out of container-first execution.
 - `auto`: use container when available, otherwise host with compatibility checks.
 
-Host compatibility checks (required in `host` and `auto` profiles):
+Determinism & Orchestration constraints:
 
-- toolchain version compliance (`rust-toolchain.toml`, Node version, etc.)
-- required binary availability
-- OS/arch support guardrails
-- extension-declared prerequisites
-
-Determinism constraints:
-
+- **Engine Determinism**: The `container` profile requires explicit configuration (`engine="docker"` or `"podman"`). If requested and missing from the host `$PATH`, execution must fail-fast instead of guessing.
 - Execution identity must include all declared fingerprint inputs and runtime profile.
 - Cache keys must include `os`, `arch`, toolchain lock dimensions.
 - Correctness must not depend on cache hits.
+- **Container Lifecycle Optimization**: CI environments should warm up caches during a baseline `build` job. Subsequent parallel `verify` jobs (lint, fmt, test) MUST restore the warmed cache as read-only and execute inside the *identical* fingerprinted image. To prevent overwhelming initialization overhead, sequential validations should be grouped within a single container spin-up where computationally appropriate.
 
 ## 8. Container and Cache Design
 
+> **Deep Dive**: For a dedicated exploration of container debugging, engine determinism, and exact stack-agnostic volume mappings, refer to the [Container and Cache Execution Design](container-execution.md) document.
+
 Canonical cache root:
 
-- `DEVFLOW_CACHE_ROOT` (default `.cache/devflow`)
-- Subdirectories:
+- `DWF_CACHE_ROOT` (default `.cache/devflow`)
+- Extensions dictate what paths are mapped to this host root generically (e.g., Rust demands `.cargo/registry`, Node demands `~/.npm`).
+- Subdirectories inside the root:
   - `registry/`
   - `git/`
   - `sccache/`
@@ -242,9 +241,9 @@ Canonical cache root:
 Policy:
 
 - Project-scoped cache by default.
-- Keep local and CI layout consistent.
+- Unified caching architecture: Identical host roots and volume mapping logic applies regardless of whether the profile is `host` or `container`. 
 - Treat cache as optimization only.
-- Allow profile-specific cache partitioning (`container` vs `host`) to avoid artifact contamination.
+- Implement robust `devflow cache prune` workflows to prevent unbounded local/CI disk growth. Validate image invalidation aggressively upon fingerprint hash drifts.
 
 ## 9. CI Design Contract (GitHub Actions)
 

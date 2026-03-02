@@ -20,6 +20,7 @@ What it does:
 - generates workflow YAML based on current config (`targets.pr`)
 - writes to `.github/workflows/ci.yml` by default
 - overwrites existing file content with the latest generated contract
+- includes cache-hit aware image build/scan gating via `image_cache` step outputs
 
 If you modify config locally and run `ci:generate` again, it re-syncs the workflow file.
 
@@ -60,3 +61,27 @@ dwf ci:plan
 ```
 
 Shows configured target profile names (`pr`, `main`, `release`, custom profiles).
+
+## Security Hardening (Least Privilege)
+
+Devflow's generated CI workflows follow the Principle of Least Privilege. By default, the `GITHUB_TOKEN` is restricted to:
+
+```yaml
+permissions:
+  contents: read
+```
+
+This ensures that CI jobs can checkout code and read repository metadata but cannot accidentally write back to the repository (e.g., creating tags, publishing releases, or modifying issues) unless explicitly granted per-job or per-step permissions.
+
+## Execution Environment
+
+### Shell Requirements
+The generated workflow requires `/bin/bash` for advanced parallel execution tracking. This is handled automatically by the containerized environment (Debian-based), but ensures that process PIDs are tracked correctly during the `verify` phase.
+
+### Parallel Execution
+To optimize CI speed, Devflow executes checks in parallel within the same container. This is managed by a background process tracking script:
+
+1. Starts checks in the background (`&`).
+2. Collects PIDs (`pids+=($!)`).
+3. Waits for all PIDs and accumulates exit codes.
+4. Fails the job if any check fails.

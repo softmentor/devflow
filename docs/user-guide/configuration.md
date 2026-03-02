@@ -42,6 +42,7 @@ required = false
 source = "path"
 path = "./tools/devflow-ext-custom"
 required = false
+trusted = false
 capabilities = ["lint:policy"]
 ```
 
@@ -73,6 +74,9 @@ capabilities = ["lint:policy"]
 - `path`: required when `source = "path"`
 - `required`: if true, load/validation failure is fatal
 - `capabilities`: optional explicit capability list
+- `trusted`: whether extension negotiation is allowed on host in container profile
+  - default: `false`
+  - set `trusted = true` only for vetted extensions you control
 
 ## `custom` Stack Command Mapping
 

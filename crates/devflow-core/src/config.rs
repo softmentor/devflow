@@ -24,10 +24,10 @@ pub struct DevflowConfig {
     pub targets: TargetsConfig,
     /// Optional extension configurations.
     pub extensions: Option<HashMap<String, ExtensionConfig>>,
-    /// Container configuration placeholders (for future use).
+    /// Container configuration for execution proxies.
     #[serde(default)]
     pub container: Option<ContainerConfig>,
-    /// Cache configuration placeholders (for future use).
+    /// Cache configuration for build artifact management.
     #[serde(default)]
     pub cache: Option<CacheConfig>,
     /// Path to the directory containing this config file, used to anchor relative paths.
@@ -59,17 +59,8 @@ impl DevflowConfig {
 
     /// Validates the configuration for logical consistency.
     fn validate(&self) -> Result<()> {
-        for stack in &self.project.stack {
-            match stack.as_str() {
-                "rust" | "node" | "custom" => {}
-                other => {
-                    return Err(anyhow!(
-                        "unsupported stack '{}' (supported: rust,node,custom)",
-                        other
-                    ));
-                }
-            }
-        }
+        // Devflow Core is stack-agnostic. We allow any stack name here, as long as
+        // an extension (builtin or subprocess) registers to handle it during runtime execution.
 
         for (profile, commands) in &self.targets.profiles {
             for raw in commands {
@@ -107,18 +98,38 @@ pub struct RuntimeConfig {
     pub profile: RuntimeProfile,
 }
 
-/// Placeholder for container configuration.
-#[derive(Debug, Deserialize, Default)]
+/// Supported container proxy engines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ContainerEngine {
+    Docker,
+    Podman,
+    #[default]
+    Auto,
+}
+
+/// Configuration for containerized execution environments.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ContainerConfig {
+    /// Optional container image name (e.g., "my-project-ci").
+    /// If not provided, a default base image may be used.
     pub image: Option<String>,
+    /// The container engine to use (e.g., "docker", "podman").
+    #[serde(default)]
+    pub engine: ContainerEngine,
+    /// List of file paths to include in the container's fingerprint calculation.
     #[serde(default)]
     pub fingerprint_inputs: Vec<String>,
 }
 
-/// Placeholder for cache configuration.
-#[derive(Debug, Deserialize, Default)]
+/// Configuration for build artifact and dependency caching.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CacheConfig {
+    /// The root directory for the Devflow cache (relative to source dir or absolute).
     pub root: Option<String>,
+    /// Reserved for future cache strategy selection (e.g., "local", "gha").
     pub strategy: Option<String>,
 }
 
@@ -150,6 +161,9 @@ pub struct ExtensionConfig {
     /// Whether this extension is required for project operations.
     #[serde(default)]
     pub required: bool,
+    /// Whether this extension is trusted to run on the host during negotiation.
+    #[serde(default)]
+    pub trusted: bool,
 }
 
 /// Source types for extensions.
@@ -204,18 +218,15 @@ mod tests {
     }
 
     #[test]
-    fn unit_test_validate_rejects_unsupported_stack() {
+    fn unit_test_validate_allows_custom_stacks() {
         let text = r#"
         [project]
-        name = "invalid-stack"
+        name = "valid-stack"
         stack = ["ruby"]
         "#;
 
         let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
-        let err = cfg
-            .validate()
-            .expect_err("Must fail validation for unsupported stack");
-        assert!(err.to_string().contains("unsupported stack 'ruby'"));
+        assert!(cfg.validate().is_ok());
     }
 
     #[test]
@@ -261,6 +272,30 @@ mod tests {
     }
 
     #[test]
+    fn integration_test_load_with_container_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("devflow.toml");
+
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "ghcr.io/demo:latest"
+        engine = "podman"
+        "#;
+
+        std::fs::write(&config_path, text).unwrap();
+
+        let cfg = DevflowConfig::load_from_file(config_path.to_str().unwrap()).unwrap();
+        assert!(cfg.container.is_some());
+        let container = cfg.container.unwrap();
+        assert_eq!(container.image.as_deref(), Some("ghcr.io/demo:latest"));
+        assert_eq!(container.engine, ContainerEngine::Podman);
+    }
+
+    #[test]
     fn security_boundary_test_load_missing_or_malformed_file() {
         // Missing file
         let err = DevflowConfig::load_from_file("/tmp/nonexistent-devflow-random-file.toml")
@@ -275,5 +310,147 @@ mod tests {
         let err = DevflowConfig::load_from_file(malformed_path.to_str().unwrap())
             .expect_err("Malformed TOML should return an error, not panic");
         assert!(err.to_string().contains("failed to parse TOML"));
+    }
+
+    #[test]
+    fn container_engine_defaults_to_auto() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "my-image:latest"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(container.engine, ContainerEngine::Auto);
+    }
+
+    #[test]
+    fn container_engine_docker_variant() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        engine = "docker"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(container.engine, ContainerEngine::Docker);
+    }
+
+    #[test]
+    fn container_config_rejects_unknown_fields() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "my-image:latest"
+        typo_field = "bad"
+        "#;
+
+        let err = toml::from_str::<DevflowConfig>(text).expect_err("must reject unknown field");
+        assert!(err.to_string().contains("typo_field"));
+    }
+
+    #[test]
+    fn cache_config_deserialization() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [cache]
+        root = ".cache/devflow"
+        strategy = "local"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let cache = cfg.cache.expect("cache section should exist");
+        assert_eq!(cache.root.as_deref(), Some(".cache/devflow"));
+        assert_eq!(cache.strategy.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn cache_config_rejects_unknown_fields() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [cache]
+        root = ".cache"
+        typo = "bad"
+        "#;
+
+        let err = toml::from_str::<DevflowConfig>(text).expect_err("must reject unknown field");
+        assert!(err.to_string().contains("typo"));
+    }
+
+    #[test]
+    fn extension_config_trusted_field() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [extensions.python]
+        source = "path"
+        path = "/usr/local/bin/devflow-ext-python"
+        trusted = true
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let extensions = cfg.extensions.expect("extensions should exist");
+        let python = extensions
+            .get("python")
+            .expect("python extension should exist");
+        assert!(python.trusted);
+    }
+
+    #[test]
+    fn extension_config_trusted_defaults_false() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [extensions.python]
+        source = "builtin"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let extensions = cfg.extensions.expect("extensions should exist");
+        let python = extensions
+            .get("python")
+            .expect("python extension should exist");
+        assert!(!python.trusted);
+    }
+
+    #[test]
+    fn container_fingerprint_inputs_deserialization() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "ci:latest"
+        fingerprint_inputs = ["Cargo.lock", "rust-toolchain.toml"]
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(
+            container.fingerprint_inputs,
+            vec!["Cargo.lock", "rust-toolchain.toml"]
+        );
     }
 }

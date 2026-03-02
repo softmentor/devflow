@@ -18,7 +18,7 @@ By the end of this page you will:
 
 ## Step 1: Install Devflow
 
-Follow [Installation](#devflow.user-guide.installation).
+Follow [Installation](installation.md).
 
 ## Step 2: Initialize Project Config and Starter CI
 
@@ -47,6 +47,14 @@ What this writes:
 
 - `devflow.toml`
 - `.github/workflows/ci.yml`
+
+### Secure by Default
+Every project initialized with `dwf init` is automatically "Hardened-by-Default":
+- **Vulnerability Scanning**: Integrated Trivy gates for dependencies and containers.
+- **Non-Root Execution**: Containers run as a non-privileged `dwfuser`.
+- **Least Privilege**: GitHub Actions `GITHUB_TOKEN` restricted to `contents: read`.
+
+See the [Security and Hardening Deep Dive](#devflow.architecture.security-and-hardening) for more details.
 
 Use `--force` to overwrite existing files:
 
@@ -113,3 +121,17 @@ dwf ci:plan
 ```
 
 This prints the target profile names currently defined in `[targets]`.
+## Step 6: GitHub Repository Standardization
+
+Devflow helps you enforce best practices on your GitHub repository using Infrastructure-as-Code.
+
+```bash
+make gh-setup
+```
+
+This will:
+- Initialize Terraform in `.github/settings/terraform`.
+- Preview changes for branch protection, required status checks, and security settings.
+- Guide you on how to apply these settings using `terraform apply`.
+
+Additionally, structured issue templates and community policies are now available in your `.github` directory and repository root.

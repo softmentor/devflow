@@ -4,6 +4,7 @@
 //! `npm` commands, enabling JavaScript/TypeScript workflows to integrate transparently
 //! into the Devflow ecosystem.
 
+use anyhow::Result;
 use devflow_core::{CommandRef, ExecutionAction, Extension};
 use std::collections::HashSet;
 
@@ -47,11 +48,11 @@ impl Extension for NodeExtension {
         .collect()
     }
 
-    fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction> {
+    fn build_action(&self, cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
         let primary = cmd.primary.as_str();
         let selector = cmd.selector.as_deref().unwrap_or("");
 
-        match (primary, selector) {
+        let action = match (primary, selector) {
             ("setup", "deps") => Some(action("npm", &["ci"])),
             ("setup", "doctor") => Some(action("npm", &["--version"])),
             ("fmt", "check") => Some(action("npm", &["run", "fmt:check"])),
@@ -64,7 +65,31 @@ impl Extension for NodeExtension {
             ("test", "smoke") => Some(action("npm", &["run", "test:smoke"])),
             ("package", "artifact") => Some(action("npm", &["pack", "--dry-run"])),
             _ => None,
-        }
+        };
+        Ok(action)
+    }
+
+    fn is_trusted(&self) -> bool {
+        true
+    }
+
+    fn cache_mounts(&self) -> Vec<String> {
+        vec!["node/npm:/root/.npm".to_string()]
+    }
+
+    fn env_vars(&self) -> std::collections::HashMap<String, String> {
+        let mut env = std::collections::HashMap::new();
+        env.insert("NPM_CONFIG_CACHE".to_string(), "/root/.npm".to_string());
+        env
+    }
+
+    fn fingerprint_inputs(&self) -> Vec<String> {
+        vec![
+            "package-lock.json".to_string(),
+            "yarn.lock".to_string(),
+            "pnpm-lock.yaml".to_string(),
+            "package.json".to_string(),
+        ]
     }
 }
 
@@ -73,6 +98,7 @@ fn action(program: &str, args: &[&str]) -> ExecutionAction {
     ExecutionAction {
         program: program.to_string(),
         args: args.iter().map(|s| s.to_string()).collect(),
+        env: std::collections::HashMap::new(),
     }
 }
 
@@ -120,7 +146,8 @@ mod tests {
         for (input_cmd, expected_shell) in tests {
             let action = ext
                 .build_action(&input_cmd)
-                .expect("Expected valid action mapping");
+                .expect("Expected valid action mapping")
+                .expect("Expected command to map to an action");
             let actual_shell = format!("{} {}", action.program, action.args.join(" "));
             assert_eq!(actual_shell, expected_shell);
         }
@@ -136,7 +163,43 @@ mod tests {
         ];
 
         for input_cmd in invalid_cmds {
-            assert!(ext.build_action(&input_cmd).is_none());
+            assert!(ext
+                .build_action(&input_cmd)
+                .expect("mapping should not error")
+                .is_none());
         }
+    }
+
+    #[test]
+    fn is_trusted_returns_true() {
+        let ext = NodeExtension::new();
+        assert!(ext.is_trusted());
+    }
+
+    #[test]
+    fn cache_mounts_returns_expected_paths() {
+        let ext = NodeExtension::new();
+        let mounts = ext.cache_mounts();
+        assert_eq!(mounts.len(), 1);
+        assert_eq!(mounts[0], "node/npm:/root/.npm");
+    }
+
+    #[test]
+    fn env_vars_returns_expected_values() {
+        let ext = NodeExtension::new();
+        let envs = ext.env_vars();
+        assert_eq!(envs.get("NPM_CONFIG_CACHE").unwrap(), "/root/.npm");
+        assert_eq!(envs.len(), 1);
+    }
+
+    #[test]
+    fn fingerprint_inputs_returns_expected_files() {
+        let ext = NodeExtension::new();
+        let inputs = ext.fingerprint_inputs();
+        assert_eq!(inputs.len(), 4);
+        assert!(inputs.contains(&"package-lock.json".to_string()));
+        assert!(inputs.contains(&"yarn.lock".to_string()));
+        assert!(inputs.contains(&"pnpm-lock.yaml".to_string()));
+        assert!(inputs.contains(&"package.json".to_string()));
     }
 }

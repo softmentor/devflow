@@ -20,6 +20,23 @@ To install an extension:
 
 Once in your `$PATH`, Devflow automatically discovers it the next time you run a command.
 
+## Trust Model for Subprocess Extensions
+
+By default, subprocess extensions are discovered but treated as **untrusted** for host-side negotiation in `runtime.profile = "container"`.
+
+- Default behavior: `trusted = false`
+- Opt-in behavior: explicitly configure trusted extensions in `devflow.toml`
+
+```toml
+[extensions.python]
+source = "path"
+path = "./tools/devflow-ext-python"
+trusted = true
+required = true
+```
+
+Use `trusted = true` only for extensions you have reviewed and control.
+
 ## Troubleshooting Extensions
 
 If a command fails because an extension isn't running as expected, you can manually isolate the problem without running Devflow.
@@ -45,3 +62,30 @@ If a command fails because an extension isn't running as expected, you can manua
 ## Developing Your Own
 
 Devflow extensions can be built in **any language**—Go, Python, Bash, Rust, etc.—because they communicate via simple standard JSON payload I/O. For detailed tutorials on creating your own custom extensions, please check our [Developer Guide](../developer-guide/developer-index.md).
+
+## Subprocess Extensions inside Containers
+
+A major advantage of the JSON-RPC architecture is that it gracefully delegates through Devflow's Container Proxy (`profile = "container"`).
+
+If you write a custom extension for Python in a script called `devflow-ext-python`:
+1. Devflow executes `devflow-ext-python` **locally on your host** when that extension is configured as `trusted = true`.
+2. The local script responds with JSON indicating how to execute `pytest`.
+3. Devflow then launches `podman run python-ext-ci pytest` via the container engine.
+
+This means you **do not** need to install your Devflow JSON-RPC extension scripts into the CI images! Devflow runs the extension locally to discover the execution boundaries, and then runs the *target toolchain* (flake8, pytest) securely isolated inside your locked container.
+
+```toml
+[project]
+name = "python-ext"
+stack = ["python"] # Stack matches the configured extension name
+
+[container]
+image = "python-ext-ci"
+engine = "podman"
+
+[extensions.python]
+source = "path"
+path = "devflow-ext-python"
+trusted = true
+required = true
+```

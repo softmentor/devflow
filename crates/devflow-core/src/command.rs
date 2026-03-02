@@ -28,6 +28,8 @@ pub enum PrimaryCommand {
     Release,
     /// CI-related operations (e.g., configuration generation).
     Ci,
+    /// Prune redundant caches or runs.
+    Prune,
 }
 
 impl PrimaryCommand {
@@ -44,6 +46,7 @@ impl PrimaryCommand {
             Self::Check => "check",
             Self::Release => "release",
             Self::Ci => "ci",
+            Self::Prune => "prune",
         }
     }
 
@@ -60,6 +63,7 @@ impl PrimaryCommand {
             Self::Release => "candidate",
             Self::Ci => "check",
             Self::Init => "rust",
+            Self::Prune => "cache",
         }
     }
 }
@@ -116,6 +120,7 @@ impl FromStr for CommandRef {
             "check" => PrimaryCommand::Check,
             "release" => PrimaryCommand::Release,
             "ci" => PrimaryCommand::Ci,
+            "prune" => PrimaryCommand::Prune,
             _ => return Err(CommandParseError::UnknownPrimary(primary_text.to_string())),
         };
 
@@ -150,5 +155,33 @@ mod tests {
         // Ensures that an invalid primary command results in a parsing error.
         let err = CommandRef::from_str("unknown:foo").expect_err("must fail");
         assert!(matches!(err, CommandParseError::UnknownPrimary(_)));
+    }
+
+    #[test]
+    fn parses_prune_command() {
+        let cmd = CommandRef::from_str("prune").expect("prune should parse");
+        assert_eq!(cmd.primary, PrimaryCommand::Prune);
+        assert_eq!(cmd.selector, None);
+    }
+
+    #[test]
+    fn parses_prune_with_selector() {
+        let cmd = CommandRef::from_str("prune:cache").expect("prune:cache should parse");
+        assert_eq!(cmd.primary, PrimaryCommand::Prune);
+        assert_eq!(cmd.selector.as_deref(), Some("cache"));
+
+        let cmd2 = CommandRef::from_str("prune:runs").expect("prune:runs should parse");
+        assert_eq!(cmd2.primary, PrimaryCommand::Prune);
+        assert_eq!(cmd2.selector.as_deref(), Some("runs"));
+    }
+
+    #[test]
+    fn prune_default_selector_is_cache() {
+        assert_eq!(PrimaryCommand::Prune.default_selector(), "cache");
+    }
+
+    #[test]
+    fn prune_as_str_returns_prune() {
+        assert_eq!(PrimaryCommand::Prune.as_str(), "prune");
     }
 }

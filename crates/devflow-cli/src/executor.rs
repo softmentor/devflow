@@ -1,24 +1,79 @@
-use std::path::Path;
+//! Command execution engine and container orchestration.
+//!
+//! This module handles the dispatch of Devflow commands to their respective
+//! extensions. It also provides the "container proxy" implementation that
+//! wraps host commands in Docker/Podman `run` calls with transparent volume mounting.
+
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use devflow_core::{CommandRef, DevflowConfig, ExecutionAction, ExtensionRegistry, PrimaryCommand};
+use devflow_core::{
+    config::ContainerEngine, runtime::RuntimeProfile, CommandRef, DevflowConfig, ExecutionAction,
+    ExtensionRegistry, PrimaryCommand,
+};
 use tracing::{info, instrument, warn};
 
+/// Default image used for containerized execution if none specified.
+const DEFAULT_CI_IMAGE: &str = "ghcr.io/softmentor/devflow-ci:latest";
+/// Default host directory for the Devflow cache.
+const DEFAULT_CACHE_ROOT: &str = ".cache/devflow";
+/// The internal container path where the project is mounted.
+const CONTAINER_WORKSPACE: &str = "/workspace";
+/// The internal container path where the host `dwf` binary is mapped.
+const CONTAINER_DWF_BIN: &str = "/usr/local/bin/dwf";
+
 /// Runs a Devflow command by dispatching it to applicable stacks.
-#[instrument(skip(cfg, registry))]
+#[instrument(skip(cfg, registry), fields(command = %command))]
 pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandRef) -> Result<()> {
     let mut attempted = false;
 
+    let mut requested_stacks = Vec::new();
     for stack in &cfg.project.stack {
-        if !stack_is_applicable(cfg, stack) {
+        if stack_is_applicable(cfg, stack) {
+            requested_stacks.push(stack.clone());
+        } else {
             info!(target: "devflow", "skip {}: manifest not found", stack);
-            continue;
         }
+    }
 
+    if let Some(extensions) = &cfg.extensions {
+        for ext_name in extensions.keys() {
+            if !requested_stacks.contains(ext_name) {
+                // Explicitly declared subprocess extensions assume implicit applicability
+                requested_stacks.push(ext_name.clone());
+            }
+        }
+    }
+
+    for stack in &requested_stacks {
         let effective = with_default_selector(command);
-        let Some(action) = map_command(stack, &effective, registry) else {
+
+        let is_already_in_container = std::env::var("IS_CONTAINER")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
+        let action_result = if cfg.runtime.profile == RuntimeProfile::Container
+            && !is_already_in_container
+        {
+            // If we are in container mode, check if the extension is trusted to run on host
+            if let Some(ext) = registry.get(stack) {
+                if ext.is_trusted() {
+                    map_command(stack, &effective, registry)
+                } else {
+                    // UNTRUSTED negotiation: we must run build_action inside a container
+                    // For now, we bail with a helpful message until the full Pre-Flight container is wired
+                    bail!("untrusted extension '{}' cannot negotiate on host in container mode. Move to trusted = true or wait for Pre-Flight jail support.", stack);
+                }
+            } else {
+                map_command(stack, &effective, registry)
+            }
+        } else {
+            map_command(stack, &effective, registry)
+        };
+
+        let Some(action) = action_result? else {
             info!(target: "devflow",
                 "skip {}: unsupported command {}",
                 stack,
@@ -28,8 +83,24 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
         };
 
         attempted = true;
-        info!(target: "devflow", "run {} on {}", effective.canonical(), stack);
-        run_action(&action)
+
+        // When IS_CONTAINER=true (e.g., inside GHA native container: job),
+        // skip the docker-run proxy even if profile is "container".
+        // This enables GHA native container jobs to run dwf commands directly.
+        let is_already_in_container = std::env::var("IS_CONTAINER")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
+        let use_container_proxy =
+            cfg.runtime.profile == RuntimeProfile::Container && !is_already_in_container;
+        let final_action = if use_container_proxy {
+            build_container_proxy(cfg, registry, &action)?
+        } else {
+            sanitize_host_env(action)
+        };
+
+        info!(target: "devflow", "run {} on {}", effective, stack);
+        run_action(&final_action)
             .with_context(|| format!("{} failed for {}", effective.canonical(), stack))?;
     }
 
@@ -43,6 +114,32 @@ pub fn run(cfg: &DevflowConfig, registry: &ExtensionRegistry, command: &CommandR
     Ok(())
 }
 
+/// Removes container-bound env values when running directly on host.
+///
+/// Extensions may return envs like `/workspace/...` or `/root/...` for container parity.
+/// In host profile these paths are often invalid or read-only and can break local execution.
+fn sanitize_host_env(mut action: ExecutionAction) -> ExecutionAction {
+    action.env.retain(|key, value| {
+        if matches!(
+            key.as_str(),
+            "CARGO_HOME"
+                | "CARGO_TARGET_DIR"
+                | "SCCACHE_DIR"
+                | "RUSTC_WRAPPER"
+                | "NPM_CONFIG_CACHE"
+        ) {
+            return false;
+        }
+
+        !(value == "/workspace"
+            || value.starts_with("/workspace/")
+            || value == "/root"
+            || value.starts_with("/root/"))
+    });
+    action
+}
+
+/// Normalizes a command by applying default selectors if missing.
 fn with_default_selector(command: &CommandRef) -> CommandRef {
     if command.selector.is_some() {
         return command.clone();
@@ -54,22 +151,25 @@ fn with_default_selector(command: &CommandRef) -> CommandRef {
     }
 }
 
+/// Checks if a stack-specific manifest (e.g., Cargo.toml) exists in the source directory.
 fn stack_is_applicable(cfg: &DevflowConfig, stack: &str) -> bool {
     let base = cfg.source_dir.as_deref().unwrap_or(Path::new(""));
     devflow_core::project::stack_is_applicable(base, stack)
 }
 
+/// Maps a logical Devflow command to a concrete execution action for a given stack.
 fn map_command(
     stack: &str,
     cmd: &CommandRef,
     registry: &ExtensionRegistry,
-) -> Option<ExecutionAction> {
+) -> Result<Option<ExecutionAction>> {
     match stack {
-        "custom" => map_custom(cmd),
+        "custom" => Ok(map_custom(cmd)),
         _ => registry.build_action(stack, cmd),
     }
 }
 
+/// Fallback logic for projects using `Makefile` or `justfile` without a specific Devflow extension.
 fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
     let target = cmd.canonical().replace(':', "-");
 
@@ -77,12 +177,14 @@ fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
         return Some(ExecutionAction {
             program: "just".to_string(),
             args: vec![target],
+            env: std::collections::HashMap::new(),
         });
     }
     if Path::new("Makefile").exists() {
         return Some(ExecutionAction {
             program: "make".to_string(),
             args: vec![target],
+            env: std::collections::HashMap::new(),
         });
     }
 
@@ -90,14 +192,17 @@ fn map_custom(cmd: &CommandRef) -> Option<ExecutionAction> {
         (PrimaryCommand::Setup, "doctor") => Some(ExecutionAction {
             program: "echo".to_string(),
             args: vec!["custom stack requires justfile or Makefile targets".to_string()],
+            env: std::collections::HashMap::new(),
         }),
         _ => None,
     }
 }
 
+/// Executes a process on the host system.
 fn run_action(action: &ExecutionAction) -> Result<()> {
     let status = Command::new(&action.program)
         .args(&action.args)
+        .envs(action.env.iter())
         .status()
         .with_context(|| {
             format!(
@@ -119,6 +224,160 @@ fn run_action(action: &ExecutionAction) -> Result<()> {
     Ok(())
 }
 
+/// Transforms a host execution action into a containerized proxy action.
+///
+/// This involves:
+/// 1. Detecting an available container engine (Docker/Podman).
+/// 2. Resolving the appropriate container image.
+/// 3. Injecting the host `dwf` binary into the container to ensure version parity.
+/// 4. Mounting the workspace and any extension-defined cache volumes.
+fn build_container_proxy(
+    cfg: &DevflowConfig,
+    registry: &ExtensionRegistry,
+    action: &ExecutionAction,
+) -> Result<ExecutionAction> {
+    let container_config = cfg.container.as_ref();
+    let engine_cfg = container_config.map(|c| c.engine).unwrap_or_default();
+
+    let engine_cmd = resolve_engine(engine_cfg)?;
+
+    let image = container_config
+        .and_then(|c| c.image.clone())
+        .unwrap_or_else(|| DEFAULT_CI_IMAGE.to_string());
+
+    let dwf_cache_root = std::env::var("DWF_CACHE_ROOT")
+        .ok()
+        .or_else(|| cfg.cache.as_ref().and_then(|c| c.root.clone()))
+        .unwrap_or_else(|| DEFAULT_CACHE_ROOT.to_string());
+
+    let cwd = std::env::current_dir()?;
+    let cwd_str = cwd.to_string_lossy();
+
+    // Version parity safety: we map the host's actively executing `dwf` binary
+    // into the container so that even if the container image is old, it always
+    // uses the exact same Devflow logic as the invoker.
+    let host_dwf_path = std::env::current_exe()?;
+    let host_dwf_str = host_dwf_path.to_string_lossy();
+
+    let mut args = vec![
+        "run".to_string(),
+        "--rm".to_string(),
+        "-v".to_string(),
+        format!("{}:{}", cwd_str, CONTAINER_WORKSPACE),
+        "-v".to_string(),
+        format!("{}:{}:ro", host_dwf_str, CONTAINER_DWF_BIN),
+        "-w".to_string(),
+        CONTAINER_WORKSPACE.to_string(),
+    ];
+
+    // Cache redirection: extensions define relative paths (e.g. ".cargo") which
+    // we anchor to the unified `DWF_CACHE_ROOT` on the host.
+    let abs_cache_root = resolve_cache_root(cfg, &dwf_cache_root);
+    let mounts = registry.all_cache_mounts();
+
+    for mount in mounts {
+        if let Some((host_rel, container_abs)) = parse_mount(&mount) {
+            let host_abs = abs_cache_root.join(host_rel);
+
+            if let Err(e) = std::fs::create_dir_all(&host_abs) {
+                warn!(
+                    "failed to create cache directory {}: {}",
+                    host_abs.display(),
+                    e
+                );
+            }
+
+            args.push("-v".to_string());
+            args.push(format!("{}:{}", host_abs.display(), container_abs));
+        } else {
+            warn!("invalid cache mount format from extension: {}", mount);
+        }
+    }
+
+    for (key, value) in &action.env {
+        args.push("-e".to_string());
+        args.push(format!("{}={}", key, value));
+    }
+
+    args.push(image);
+    args.push(action.program.clone());
+    args.extend(action.args.clone());
+
+    Ok(ExecutionAction {
+        program: engine_cmd,
+        args,
+        env: action.env.clone(),
+    })
+}
+
+fn resolve_engine(engine_cfg: ContainerEngine) -> Result<String> {
+    let cmd = match engine_cfg {
+        ContainerEngine::Docker => "docker",
+        ContainerEngine::Podman => "podman",
+        ContainerEngine::Auto => {
+            if is_engine_healthy("podman") {
+                "podman"
+            } else if is_engine_healthy("docker") {
+                "docker"
+            } else if command_exists("podman") {
+                "podman"
+            } else if command_exists("docker") {
+                "docker"
+            } else {
+                bail!("no container engine (docker or podman) found on PATH");
+            }
+        }
+    };
+
+    if !command_exists(cmd) {
+        bail!("required container engine '{cmd}' is not installed or not on PATH");
+    }
+
+    info!(target: "devflow", "using container engine: {}", cmd);
+    Ok(cmd.to_string())
+}
+
+/// Checks if an engine is not only installed but also has a responsive daemon.
+fn is_engine_healthy(name: &str) -> bool {
+    if !command_exists(name) {
+        return false;
+    }
+    // 'info' usually requires a working daemon link
+    Command::new(name)
+        .arg("info")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn resolve_cache_root(cfg: &DevflowConfig, root: &str) -> PathBuf {
+    let path = PathBuf::from(root);
+    if path.is_absolute() {
+        return path;
+    }
+
+    let source_dir = cfg.source_dir.as_deref().unwrap_or_else(|| Path::new("."));
+    let abs_source = if source_dir.is_absolute() {
+        source_dir.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(source_dir)
+    };
+
+    abs_source.join(root)
+}
+
+fn parse_mount(mount: &str) -> Option<(&str, &str)> {
+    let parts: Vec<&str> = mount.split(':').collect();
+    if parts.len() == 2 {
+        Some((parts[0], parts[1]))
+    } else {
+        None
+    }
+}
+
+/// Checks if a command exists on the host system.
 fn command_exists(name: &str) -> bool {
     Command::new(name).arg("--version").status().is_ok()
 }
@@ -167,6 +426,7 @@ mod tests {
         let action = ExecutionAction {
             program: "echo".to_string(),
             args: vec!["hello".to_string(), "world".to_string()],
+            env: std::collections::HashMap::new(),
         };
         // Should succeed without error
         assert!(run_action(&action).is_ok());
@@ -177,6 +437,7 @@ mod tests {
         let action = ExecutionAction {
             program: "false".to_string(), // Typical unix command that always fails
             args: vec![],
+            env: std::collections::HashMap::new(),
         };
         let result = run_action(&action);
         assert!(result.is_err());
@@ -191,8 +452,184 @@ mod tests {
         let action = ExecutionAction {
             program: "this-program-definitely-does-not-exist-123".to_string(),
             args: vec![],
+            env: std::collections::HashMap::new(),
         };
         let result = run_action(&action);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn host_env_sanitizer_drops_container_paths() {
+        let mut env = std::collections::HashMap::new();
+        env.insert(
+            "CARGO_HOME".to_string(),
+            "/workspace/.cargo-cache".to_string(),
+        );
+        env.insert("NPM_CONFIG_CACHE".to_string(), "/root/.npm".to_string());
+        env.insert("RUSTC_WRAPPER".to_string(), "sccache".to_string());
+        env.insert("CI".to_string(), "true".to_string());
+
+        let out = sanitize_host_env(ExecutionAction {
+            program: "echo".to_string(),
+            args: vec!["ok".to_string()],
+            env,
+        });
+
+        assert!(!out.env.contains_key("CARGO_HOME"));
+        assert!(!out.env.contains_key("NPM_CONFIG_CACHE"));
+        assert!(!out.env.contains_key("RUSTC_WRAPPER"));
+        assert_eq!(out.env.get("CI").map(String::as_str), Some("true"));
+    }
+
+    #[test]
+    fn parse_mount_valid_splits() {
+        assert_eq!(parse_mount("a:b"), Some(("a", "b")));
+        assert_eq!(
+            parse_mount("rust/cargo:/workspace/.cargo"),
+            Some(("rust/cargo", "/workspace/.cargo"))
+        );
+        assert_eq!(
+            parse_mount("node/npm:/root/.npm"),
+            Some(("node/npm", "/root/.npm"))
+        );
+    }
+
+    #[test]
+    fn parse_mount_rejects_invalid() {
+        assert!(parse_mount("").is_none());
+        assert!(parse_mount("no-colon").is_none());
+        assert!(parse_mount("a:b:c").is_none());
+    }
+
+    #[test]
+    fn resolve_cache_root_absolute_passthrough() {
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig::default(),
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: None,
+            container: None,
+            cache: None,
+            source_dir: None,
+        };
+        let result = resolve_cache_root(&cfg, "/absolute/path");
+        assert_eq!(result, PathBuf::from("/absolute/path"));
+    }
+
+    #[test]
+    fn resolve_cache_root_relative_anchored_to_source_dir() {
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig::default(),
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: None,
+            container: None,
+            cache: None,
+            source_dir: Some(PathBuf::from("/project")),
+        };
+        let result = resolve_cache_root(&cfg, ".cache/devflow");
+        assert_eq!(result, PathBuf::from("/project/.cache/devflow"));
+    }
+
+    // Mock extension that returns is_trusted() = false for trust enforcement testing.
+    #[derive(Debug)]
+    struct UntrustedMockExtension;
+
+    impl devflow_core::Extension for UntrustedMockExtension {
+        fn name(&self) -> &str {
+            "python"
+        }
+        fn capabilities(&self) -> std::collections::HashSet<String> {
+            std::collections::HashSet::from(["test:unit".to_string()])
+        }
+        fn build_action(&self, _cmd: &CommandRef) -> anyhow::Result<Option<ExecutionAction>> {
+            Ok(Some(ExecutionAction {
+                program: "echo".to_string(),
+                args: vec!["test".to_string()],
+                env: std::collections::HashMap::new(),
+            }))
+        }
+        fn is_trusted(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn trust_enforcement_bails_for_untrusted_extension() {
+        use devflow_core::config::{ExtensionConfig, ExtensionSource};
+        use devflow_core::runtime::RuntimeProfile;
+
+        let mut extensions = std::collections::HashMap::new();
+        extensions.insert(
+            "python".to_string(),
+            ExtensionConfig {
+                source: ExtensionSource::Path,
+                path: Some(PathBuf::from("/usr/local/bin/devflow-ext-python")),
+                version: None,
+                api_version: None,
+                capabilities: vec![],
+                required: false,
+                trusted: false,
+            },
+        );
+
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "trust-test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig {
+                profile: RuntimeProfile::Container,
+            },
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: Some(extensions),
+            container: None,
+            cache: None,
+            source_dir: None,
+        };
+
+        let mut registry = ExtensionRegistry::default();
+        registry.register(Box::new(UntrustedMockExtension));
+
+        let command = cmd(PrimaryCommand::Test, Some("unit"));
+        let result = run(&cfg, &registry, &command);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("untrusted extension"),
+            "should bail with untrusted extension message"
+        );
+    }
+
+    #[test]
+    fn sanitize_host_env_drops_workspace_and_root_paths() {
+        let mut env = std::collections::HashMap::new();
+        env.insert("MY_VAR".to_string(), "/workspace/something".to_string());
+        env.insert("OTHER".to_string(), "/root/.config".to_string());
+        env.insert("GOOD".to_string(), "/home/user".to_string());
+
+        let out = sanitize_host_env(ExecutionAction {
+            program: "test".to_string(),
+            args: vec![],
+            env,
+        });
+
+        assert!(!out.env.contains_key("MY_VAR"));
+        assert!(!out.env.contains_key("OTHER"));
+        assert_eq!(out.env.get("GOOD").map(String::as_str), Some("/home/user"));
     }
 }

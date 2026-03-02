@@ -8,7 +8,14 @@ profile = "auto"
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
 main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration", "test:smoke"]
+security = ["check:security"]
 
 [extensions.rust]
 source = "builtin"
 required = true
+
+[container]
+# You can customize this base image via Dockerfile.devflow
+image = "my-rust-project-ci:latest"
+engine = "auto"
+

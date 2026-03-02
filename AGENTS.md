@@ -11,7 +11,7 @@ stack-specific toolchain invocations (Rust via cargo, Node via npm). The goal is
 local/CI parity: the same commands run identically on a developer's machine and in
 GitHub Actions.
 
-**Current status**: v0.1.0, early development. The walking skeleton works — commands
+**Current status**: v0.2.0, stable container-orchestrated CLI. The core platform supports
 parse, config validates, extensions register, and processes spawn. There are known
 architectural debts tracked in `docs/reference/v0.1.0-critical-review.md`.
 

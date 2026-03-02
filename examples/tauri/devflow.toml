@@ -1,14 +1,22 @@
 [project]
 name = "tauri"
-stack = ["node"]
+stack = ["rust", "node"]
 
 [runtime]
-profile = "auto"
+profile = "container"
 
 [targets]
 pr = ["fmt:check", "lint:static", "build:debug", "test:unit", "test:integration"]
 main = ["fmt:check", "lint:static", "build:release", "test:unit", "test:integration"]
 
+[extensions.rust]
+source = "builtin"
+required = true
+
 [extensions.node]
 source = "builtin"
 required = true
+
+[container]
+image = "devflow-ci-tauri"
+engine = "auto"
