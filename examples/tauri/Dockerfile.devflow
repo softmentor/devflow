@@ -28,7 +28,7 @@ WORKDIR /workspace
 # ------------------------------------------------------------------------------
 # Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
-FROM rust:1.85.0-slim-bookworm AS ci
+FROM rust:1.93.1-slim-bookworm AS ci
 LABEL org.opencontainers.image.description="Devflow Tauri Toolchain (Node + Rust)"
 
 # Install minimal build deps and curl in the CI stage
