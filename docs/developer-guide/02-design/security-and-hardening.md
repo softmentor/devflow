@@ -13,20 +13,23 @@ Devflow orchestrates four distinct security scanning layers to ensure comprehens
 
 | Layer | Tooling | Focus | Frequency |
 | :--- | :--- | :--- | :--- |
-| **Code** | GitHub Advanced Security (CodeQL) | SAST, Secret Leaks, Logic Flaws | Every Push/PR |
+| **Code** | GitHub Advanced Security (CodeQL) | Logic Flaws, Logic errors | Every Push/PR |
 | **Dependencies** | Trivy (FS mode) | Known CVEs in OSS libraries | Local CI & Every PR |
-| **Images** | Trivy (Image mode) | OS vulnerabilities, Malware | Image Build & Nightly |
-| **Infrastructure** | Trivy (Config mode) | Dockerfile/IAC misconfigurations | Local CI & Release |
+| **Images/Tars** | Trivy (Image mode) | OS packages, Base image CVEs | Image Build & Nightly |
+| **Infra (IaC)** | Trivy (Config mode) | Dockerfile misconfigurations | Local CI & Release |
 
-### Dependency Scanning (Push-Left)
-To catch vulnerable libraries before they reach CI, Devflow promotes local dependency scanning. 
-- **Local**: `dwf check:security` runs a local filesystem scan.
-- **IDE**: We recommend using the **Trivy** or **Snyk** IDE extensions for real-time feedback in VS Code/IntelliJ.
+### 🔄 Vulnerability Database Sync
 
-### Image Scanning (Operational Efficiency)
+A common question is how to ensure the vulnerability database (VDB) is synchronized between local and CI environments.
+
+- **Auto-Update**: Trivy automatically checks for and downloads database updates on every run. This ensures that both local and CI environments are checking against the latest known CVEs from the same upstream sources (GHSA, NVD).
+- **CI Persistence**: In GitHub Actions, we use `aquasecurity/setup-trivy` with `cache: true` to persist the VDB across jobs, reducing restoration time.
+- **Local Consistency**: To manually trigger a fresh database pull locally, you can run `trivy image --download-db-only`.
+
+### Operational Efficiency (Friction Reduction)
 Scanning every image on every PR check can be resource-intensive. Devflow optimizes this by:
-- **Build-time**: Scanning occurs only when a new image is generated (e.g., changes to `Dockerfile` or toolchain manifests).
-- **Nightly/Release**: A full image scan is performed nightly on the `main` branch and for every tagged release to catch newly discovered CVEs in persistent base images.
+- **Scan-on-Change**: Full image/tar scans are only triggered in CI when the `Dockerfile.devflow` or toolchain manifests (`Cargo.lock`, `package-lock.json`) are modified.
+- **Nightly Guardrails**: A scheduled cron (`0 0 * * *`) executes a full scan on the `main` branch, ensuring that "Zero-Day" vulnerabilities in stagnant base images are caught within 24 hours.
 
 ## 2. Hardened-by-Default Infrastructure
 

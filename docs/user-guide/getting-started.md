@@ -54,7 +54,7 @@ Every project initialized with `dwf init` is automatically "Hardened-by-Default"
 - **Non-Root Execution**: Containers run as a non-privileged `dwfuser`.
 - **Least Privilege**: GitHub Actions `GITHUB_TOKEN` restricted to `contents: read`.
 
-See the [Security and Hardening Deep Dive](file:///Users/jinythattil/jt/code/softmentor/devflow/docs/developer-guide/02-design/security-and-hardening.md) for more details.
+See the [Security and Hardening Deep Dive](devflow.architecture.security-and-hardening) for more details.
 
 Use `--force` to overwrite existing files:
 

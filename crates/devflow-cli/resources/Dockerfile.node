@@ -1,30 +1,53 @@
-# Devflow multi-stage Node.js container execution blueprint
+# Devflow multi-stage Node/TypeScript container execution blueprint
+# 2025 Best Practices: Non-root, Tini, BuildKit Cache Mounts
 
 # ------------------------------------------------------------------------------
 # Stage 1: Base OS dependencies (Highly Stable Cache)
 # ------------------------------------------------------------------------------
 FROM debian:12.8-slim AS base
-LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Build Essentials)"
+LABEL org.opencontainers.image.description="Devflow OS Base (Debian Bookworm + Tini)"
 
-# Install core system dependencies required by Node native extensions (node-gyp)
-# This layer rarely changes and remains heavily cached globally.
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
     curl \
     git \
-    build-essential \
-    python3 \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    tini \
+    --no-install-recommends
 
 WORKDIR /workspace
 
 # ------------------------------------------------------------------------------
 # Stage 2: Toolchains & Devflow CI (Language Specific Cache)
 # ------------------------------------------------------------------------------
-FROM node:22.14.0-slim AS ci
-LABEL org.opencontainers.image.description="Devflow Node Toolchain"
+FROM node:22-bookworm-slim AS ci
+LABEL org.opencontainers.image.description="Devflow Node.js Toolchain (node, npm, tsc)"
 
-# Inherit OS base
-COPY --from=base / /
+# Inherit tini from base
+COPY --from=base /usr/bin/tini /usr/bin/tini
+
+# Install minimal build tools
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    python3 \
+    --no-install-recommends
+
+# Setup non-root user for security (UID 1001)
+RUN groupadd -g 1001 dwfgroup && \
+    useradd -u 1001 -g dwfgroup -m -s /bin/bash dwfuser
+
+# Install high-speed CLI tools with cache mounts
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g typescript ts-node
 
 WORKDIR /workspace
+
+# Set ownership and switch to non-root user
+RUN chown -R dwfuser:dwfgroup /workspace
+USER dwfuser
+
+ENTRYPOINT ["/usr/bin/tini", "--"]

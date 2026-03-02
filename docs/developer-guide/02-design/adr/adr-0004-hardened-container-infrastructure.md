@@ -25,7 +25,7 @@ We have decided to re-architect our container infrastructure around four pillars
 3. **BuildKit Optimizations**:
    - Using `--mount=type=cache` for persistent `apt` and `cargo` registries, significantly reducing rebuild times by avoiding redundant network requests.
 4. **Automated Vulnerability Scanning**:
-   - Integrating **Trivy** directly into the CI build pipeline (`prep` job) with a policy to fail builds containing `CRITICAL` or `HIGH` vulnerabilities (See [ADR-0005 Vulnerability Scanning Strategy](file:///Users/jinythattil/jt/code/softmentor/devflow/docs/developer-guide/02-design/adr/adr-0005-vulnerability-scanning-strategy.md)).
+   - Integrating **Trivy** directly into the CI build pipeline (`prep` job) with a policy to fail builds containing `CRITICAL` or `HIGH` vulnerabilities (See [ADR-0005 Vulnerability Scanning Strategy](#devflow.developer-guide.design.adr-0005)).
 
 ## Consequences
 
