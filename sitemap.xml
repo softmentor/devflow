@@ -29,6 +29,9 @@
     <loc>http://localhost:3000/new-stacks</loc>
   </url>
   <url>
+    <loc>http://localhost:3000/multi-stack</loc>
+  </url>
+  <url>
     <loc>http://localhost:3000/custom-extensions</loc>
   </url>
   <url>
@@ -56,6 +59,12 @@
     <loc>http://localhost:3000/extensions</loc>
   </url>
   <url>
+    <loc>http://localhost:3000/container-execution</loc>
+  </url>
+  <url>
+    <loc>http://localhost:3000/security-and-hardening</loc>
+  </url>
+  <url>
     <loc>http://localhost:3000/index-1</loc>
   </url>
   <url>
@@ -66,6 +75,12 @@
   </url>
   <url>
     <loc>http://localhost:3000/adr-0003-dynamic-extension-wiring</loc>
+  </url>
+  <url>
+    <loc>http://localhost:3000/adr-0004-hardened-container-infrastructure</loc>
+  </url>
+  <url>
+    <loc>http://localhost:3000/adr-0005-vulnerability-scanning-strategy</loc>
   </url>
   <url>
     <loc>http://localhost:3000/workflow</loc>

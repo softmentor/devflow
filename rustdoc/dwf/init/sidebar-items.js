@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["InitTemplate"],"fn":["detect_template","run","write_if_absent"]};

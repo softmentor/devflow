@@ -1,0 +1,2 @@
+createSrcSidebar('[["devflow_core",["",[["extension",[],["subprocess.rs"]]],["command.rs","config.rs","constants.rs","extension.rs","fingerprint.rs","lib.rs","project.rs","runtime.rs"]]],["devflow_ext_node",["",[],["lib.rs"]]],["devflow_ext_rust",["",[],["lib.rs"]]],["devflow_gh",["",[],["lib.rs"]]],["devflow_policy",["",[],["lib.rs"]]],["dwf",["",[],["discovery.rs","executor.rs","init.rs","main.rs","styles.rs"]]],["rust_lib",["",[],["lib.rs"]]]]');
+//{"start":19,"fragment_lengths":[167,40,40,34,38,79,32]}

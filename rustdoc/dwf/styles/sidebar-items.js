@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["COMMAND","DESC","ERROR","HEADER","LITERAL","PLACEHOLDER","USAGE"],"fn":["get_clap_styles"]};
