@@ -44,7 +44,23 @@ We use `tini` as the container `ENTRYPOINT`. It acts as an init process, correct
 ### Rootless Workflow Compatibility
 The Devflow executor is tested for compatibility with **rootless Podman** and **Docker Rootless Mode**, ensuring developers don't need `sudo` to run their local verification suites.
 
-## 3. Least Privilege GITHUB_TOKEN
+## 3. Complex Stack Hardening
+
+Devflow's hardening strategy extends to modern, complex development use cases:
+
+### Multi-Stack (e.g., Tauri)
+For projects involving multiple language toolchains (e.g., Rust + Node.js), Devflow uses a **Layered Base Stage** approach. 
+1.  **Shared Base**: A single Debian-slim stage contains the OS-level dependencies (GTK, WebKit, etc.) and `tini`.
+2.  **Toolchain Injection**: Subsequent stages inherit from this base, ensuring that security patches and the init process are consistent across the entire multi-stack environment.
+3.  **Unified User**: Both Node and Rust processes operate under the same `dwfuser` (UID 1001), simplifying permission management for shared `/workspace` volumes.
+
+### Subprocess Extensions (e.g., Python-ext)
+Devflow encourages a "Security-by-Isolation" model for extensions:
+- **Sandbox Boundary**: When an extension is executed via `dwf`, it runs inside the same hardened container as the main project.
+- **Protocol Security**: Communication between Devflow and the subprocess occurs over standard I/O (JSON-RPC), avoiding the need for network sockets or elevated privileges.
+- **Runtime Hardening**: Python-based extensions leverage dedicated `pip` cache mounts and a non-root environment, preventing extension-based supply chain attacks from escalating to the host.
+
+## 4. Least Privilege GITHUB_TOKEN
 
 Devflow's `ci:generate` command explicitly configures the GitHub Actions workflow with a root-level `permissions` block:
 
@@ -55,10 +71,10 @@ permissions:
 
 This prevents the `GITHUB_TOKEN` from having broad write access by default, protecting your repository from unauthorized modifications during the build phase.
 
-## 4. Setup and Automation
+## 5. Setup and Automation
 
 When running `dwf init`, Devflow automatically:
-1.  Generates the hardened `Dockerfile.devflow`.
+1.  Generates the hardened `Dockerfile.devflow` (correctly versioned to the latest stable toolchains, e.g., Rust 1.93.1).
 2.  Configures `docker-bake.hcl` for high-speed, secure builds.
 3.  Injects security gates into the `.github/workflows/ci.yml`.
 
