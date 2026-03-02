@@ -57,15 +57,19 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
+      - name: Install Trivy
+        if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
+        uses: aquasecurity/setup-trivy@v0.2.5
+        with:
+          cache: true
+
       - name: Generate Trivy Vulnerability Report (JSON)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'json'
-          output: 'trivy-report.json'
-          exit-code: 0
+        run: |
+          trivy fs . \
+            --format json \
+            --output trivy-report.json \
+            --exit-code 0
 
       - name: Upload Vulnerability Scan Results
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -75,17 +79,14 @@ jobs:
           path: trivy-report.json
           retention-days: 30
 
-      - name: Fail build on High/CRITICAL Vulnerabilities
+      - name: Fail build on HIGH/CRITICAL Vulnerabilities
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true
-          exit-code: 1
-          skip-setup-trivy: true
+        run: |
+          trivy fs . \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format table \
+            --exit-code 1
 
       - name: Save CI Image Tar
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
@@ -110,6 +111,8 @@ jobs:
     needs: [prep]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
@@ -166,6 +169,8 @@ jobs:
     needs: [prep, build]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
@@ -199,31 +204,31 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e CARGO_HOME=/workspace/.cargo-cache \
-            -e CARGO_TARGET_DIR=/workspace/target/ci \
-            -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
-            -e RUSTC_WRAPPER=sccache \
+            -e CARGO_HOME="/workspace/.cargo-cache" \
+            -e CARGO_TARGET_DIR="/workspace/target/ci" \
+            -e SCCACHE_DIR="/workspace/.cargo-cache/sccache" \
+            -e RUSTC_WRAPPER="sccache" \
             devflow-ci:latest \
-            sh -c "cargo install --path crates/devflow-cli --debug --root /workspace/.cargo-cache"
+            /bin/bash -c "cargo install --path crates/devflow-cli --debug --root /workspace/.cargo-cache"
 
       - name: Run Sequential Checks
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e CARGO_HOME=/workspace/.cargo-cache \
-            -e CARGO_TARGET_DIR=/workspace/target/ci \
-            -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
-            -e RUSTC_WRAPPER=sccache \
-            -e IS_CONTAINER=true \
-            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-            -e GITHUB_REPOSITORY=${{ github.repository }} \
-            -e GITHUB_SHA=${{ github.sha }} \
-            -e GITHUB_HEAD_SHA=${{ github.event.pull_request.head.sha }} \
-            -e GITHUB_RUN_ID=${{ github.run_id }} \
-            -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e CARGO_HOME="/workspace/.cargo-cache" \
+            -e CARGO_TARGET_DIR="/workspace/target/ci" \
+            -e SCCACHE_DIR="/workspace/.cargo-cache/sccache" \
+            -e RUSTC_WRAPPER="sccache" \
+            -e IS_CONTAINER="true" \
+            -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -e GITHUB_SHA="${{ github.sha }}" \
+            -e GITHUB_HEAD_SHA="${{ github.event.pull_request.head.sha }}" \
+            -e GITHUB_RUN_ID="${{ github.run_id }}" \
+            -e PATH="/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             devflow-ci:latest \
-            sh -c "pids=(); dwf --report fmt-check fmt:check & pids+=($!); dwf --report lint-static lint:static & pids+=($!); dwf --report build-debug build:debug & pids+=($!); dwf --report test-unit test:unit & pids+=($!); dwf --report test-integration test:integration & pids+=($!); exit_code=0; for pid in ${pids[@]}; do wait $pid || exit_code=$?; done; exit $exit_code"
+            /bin/bash -c "pids=(); dwf --report fmt-check fmt:check & pids+=($!); dwf --report lint-static lint:static & pids+=($!); dwf --report build-debug build:debug & pids+=($!); dwf --report test-unit test:unit & pids+=($!); dwf --report test-integration test:integration & pids+=($!); exit_code=0; for pid in ${pids[@]}; do wait $pid || exit_code=$?; done; exit $exit_code"
 
       - name: Fix Cache Permissions
         if: always()

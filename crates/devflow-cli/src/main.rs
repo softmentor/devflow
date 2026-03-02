@@ -24,10 +24,47 @@ use styles as s;
 #[command(version)]
 #[command(styles = s::get_clap_styles())]
 #[command(
-    help_template = "{bin} {version}\n\n{about-with-newline}{usage-heading} {usage}\n\n{all-args}{after-help}"
+    help_template = "\
+{bin} {version}
+{about}
+
+Usage: {usage}
+
+Arguments:
+  [COMMAND]   Primary command (e.g., init, check, test, ci, prune)
+  [SELECTOR]  Specific behavior (e.g., pr, security, unit, generate)
+
+Options:
+{options}
+
+Commands (by Lifecycle):
+  Project Setup
+    init                       Bootstrap project from templates
+    setup:doctor               Verify toolchains and environment
+    setup:deps                 Fetch and cache dependencies
+
+  Development Loop (Frequent)
+    check:pr                   Run standard PR verification (fmt, lint, build, test)
+    fmt:fix                    Automatically apply formatting fixes
+    test:unit                  Run unit tests
+    build:debug                Incremental debug build
+
+  Security & Infrastructure
+    check:security             Run local vulnerability scan
+    lint:static                Run static analyzers
+    ci:generate                Sync GitHub Actions workflow
+    prune:cache                Cleanup local/GH caches
+
+Examples:
+  dwf init                     # Bootstrap project
+  dwf check pr                 # Run all PR checks
+  dwf check security           # Run vulnerability scan
+  dwf prune:cache --all        # Prune all caches
+
+Documentation: https://github.com/softmentor/devflow
+"
 )]
 #[command(about = "Modern developer workflow automation")]
-#[command(long_about = "Devflow is a high-performance developer workflow engine.")]
 pub(crate) struct Cli {
     /// Command in canonical form, for example: `check:pr`, `fmt:fix`, `test:unit`
     command: Option<String>,
@@ -61,14 +98,12 @@ pub(crate) struct Cli {
 }
 
 fn main() -> Result<()> {
-    eprintln!("[debug] starting dwf...");
     let format = fmt::format()
         .with_target(false)
         .with_level(true)
         .with_timer(fmt::time::uptime())
         .compact();
 
-    eprintln!("[debug] initializing tracing...");
     tracing_subscriber::registry()
         .with(
             fmt::layer()
@@ -78,20 +113,16 @@ fn main() -> Result<()> {
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
-    eprintln!("[debug] parsing arguments...");
     let cli = Cli::parse();
     debug!("parsed cli arguments: {:?}", cli);
 
-    eprintln!("[debug] processing command...");
     let command_name = match &cli.command {
         Some(cmd) => cmd,
         None => {
             use clap::CommandFactory;
-            eprintln!("[debug] printing help...");
             Cli::command().print_help()?;
             println!(); // Add a newline after help
-            eprintln!("[debug] help printed.");
-            return Ok(());
+            std::process::exit(0);
         }
     };
 

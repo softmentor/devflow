@@ -134,6 +134,7 @@ fi
 if [ -n "${SELECTED_LOCAL}" ]; then
     log "installing from local build: ${SELECTED_LOCAL}"
     mkdir -p "${INSTALL_DIR}"
+    rm -f "${TARGET_BIN}"
     cp "${SELECTED_LOCAL}" "${TARGET_BIN}"
     chmod +x "${TARGET_BIN}"
     ensure_path_persisted
@@ -186,6 +187,7 @@ if [ -n "$OS_NAME" ] && [ -n "$ARCH_NAME" ] && command -v curl >/dev/null 2>&1 &
             
             log "installing to ${TARGET_BIN}"
             mkdir -p "${INSTALL_DIR}"
+            rm -f "${TARGET_BIN}"
             cp "$TMP_DIR/dwf" "${TARGET_BIN}"
             chmod +x "${TARGET_BIN}"
             rm -rf "$TMP_DIR"
@@ -218,6 +220,7 @@ cargo build --release -p devflow-cli --manifest-path "${ROOT_DIR}/Cargo.toml"
 
 log "installing to ${TARGET_BIN}"
 mkdir -p "${INSTALL_DIR}"
+rm -f "${TARGET_BIN}"
 cp "${ROOT_DIR}/target/release/dwf" "${TARGET_BIN}"
 chmod +x "${TARGET_BIN}"
 

@@ -18,20 +18,50 @@ General form:
 dwf <primary>:<selector>
 ```
 
-## Primary Commands
+## Command Glossary
 
-| Command | Purpose | Typical Usage | Mutates Files? |
-| --- | --- | --- | --- |
-| `init` | bootstrap config and starter CI workflow | `init`, `init rust`, `init kotlin` | yes |
-| `setup` | prepare dependencies and environment checks | `setup:doctor`, `setup:deps` | sometimes |
-| `fmt` | formatting checks/fixes | `fmt:check`, `fmt:fix` | `fmt:fix` yes |
-| `lint` | static/policy analysis | `lint:static` | no |
-| `build` | compile/package prep builds | `build:debug`, `build:release` | build artifacts only |
-| `test` | execute test scopes | `test:unit`, `test:integration`, `test:smoke` | no |
-| `package` | prepare distributable outputs | `package:artifact` | artifacts only |
-| `check` | run a configured quality profile | `check:pr`, `check:main` | depends on profile |
-| `release` | release-oriented tasks | `release:candidate` | artifacts/metadata |
-| `ci` | CI workflow generation and validation | `ci:generate`, `ci:check`, `ci:plan` | `ci:generate` yes |
+Devflow commands are categorized by their role in the developer lifecycle.
+
+### Initialization & Environment
+| Command | Description |
+| --- | --- |
+| `init` | Bootstrap a project (detects stack automatically) |
+| `setup:doctor` | Verify host toolchains and environment |
+| `setup:deps` | Fetch and pre-cache project dependencies |
+| `setup:toolchain` | Install/update required language toolchains |
+
+### Verification & Security
+| Command | Description |
+| --- | --- |
+| `check:pr` | Run the standard PR verification (fmt, lint, build, test) |
+| `check:security` | Run local vulnerability scan on CI images (requires Trivy) |
+| `test:unit` | Run project unit tests |
+| `test:integration` | Run integration/infrastructure tests |
+| `test:smoke` | Run high-level end-to-end smoke tests |
+
+### Development Workflow
+| Command | Description |
+| --- | --- |
+| `fmt:check` | Check if code matches project formatting standards |
+| `fmt:fix` | Automatically apply formatting fixes |
+| `lint:static` | Run clippy, eslint, or other static analyzers |
+| `build:debug` | Perform an incremental debug build |
+| `build:release` | Perform an optimized production build |
+
+### CI Infrastructure
+| Command | Description |
+| --- | --- |
+| `ci:generate` | Sync `.github/workflows/ci.yml` with `devflow.toml` |
+| `ci:check` | Verify if local CI workflow matches current config |
+| `ci:plan` | Preview the CI execution strategy and profiles |
+
+### Maintenance & Release
+| Command | Description |
+| --- | --- |
+| `prune:cache` | Cleanup local or GHA caches (use `--local`, `--gh`, `--all`) |
+| `prune:runs` | Clean up stale GHA workflow runs (use `--gh`) |
+| `package:artifact` | Build and bundle project distribution artifacts |
+| `release:candidate` | Tag and prepare a new release candidate |
 
 ## Common Selectors
 

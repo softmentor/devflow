@@ -59,7 +59,7 @@ jobs:
 
       - name: Install Trivy
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/setup-trivy@v0.2.2
+        uses: aquasecurity/setup-trivy@v0.2.5
         with:
           cache: true
 
@@ -204,31 +204,31 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e CARGO_HOME=/workspace/.cargo-cache \
-            -e CARGO_TARGET_DIR=/workspace/target/ci \
-            -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
-            -e RUSTC_WRAPPER=sccache \
+            -e CARGO_HOME="/workspace/.cargo-cache" \
+            -e CARGO_TARGET_DIR="/workspace/target/ci" \
+            -e SCCACHE_DIR="/workspace/.cargo-cache/sccache" \
+            -e RUSTC_WRAPPER="sccache" \
             devflow-ci:latest \
-            sh -c "cargo install --path crates/devflow-cli --debug --root /workspace/.cargo-cache"
+            /bin/bash -c "cargo install --path crates/devflow-cli --debug --root /workspace/.cargo-cache"
 
       - name: Run Sequential Checks
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -e CARGO_HOME=/workspace/.cargo-cache \
-            -e CARGO_TARGET_DIR=/workspace/target/ci \
-            -e SCCACHE_DIR=/workspace/.cargo-cache/sccache \
-            -e RUSTC_WRAPPER=sccache \
-            -e IS_CONTAINER=true \
-            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-            -e GITHUB_REPOSITORY=${{ github.repository }} \
-            -e GITHUB_SHA=${{ github.sha }} \
-            -e GITHUB_HEAD_SHA=${{ github.event.pull_request.head.sha }} \
-            -e GITHUB_RUN_ID=${{ github.run_id }} \
-            -e PATH=/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e CARGO_HOME="/workspace/.cargo-cache" \
+            -e CARGO_TARGET_DIR="/workspace/target/ci" \
+            -e SCCACHE_DIR="/workspace/.cargo-cache/sccache" \
+            -e RUSTC_WRAPPER="sccache" \
+            -e IS_CONTAINER="true" \
+            -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -e GITHUB_SHA="${{ github.sha }}" \
+            -e GITHUB_HEAD_SHA="${{ github.event.pull_request.head.sha }}" \
+            -e GITHUB_RUN_ID="${{ github.run_id }}" \
+            -e PATH="/workspace/.cargo-cache/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             devflow-ci:latest \
-            sh -c "{{COMMANDS}}"
+            /bin/bash -c "{{COMMANDS}}"
 
       - name: Fix Cache Permissions
         if: always()
