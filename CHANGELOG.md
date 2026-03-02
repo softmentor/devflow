@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hardened Container Infrastructure**: Universal security hardening across all stacks (Rust, Node, Python, Tauri) using 2025 best practices.
 - **Docker Bake Integration**: Centralized, declarative build management with `zstd` compression and multi-platform support.
 - **Vulnerability Scanning**: Integrated Trivy automated scanning into the CI pipeline to fail on CRITICAL/HIGH CVEs.
+- **Local Security Scan**: Added `make scan` and `dwf check:security` for local vulnerability detection via Trivy.
+- **Environmental Cleanup**: Added `make teardown` and `dwf prune:*` commands for localized and remote (GHA) cache/run management.
 
 ### Changed
 - Refactored `executor.rs` for modular container orchestration.
@@ -24,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - QEMU architecture mismatches by dynamically detecting host architecture for CI toolchain downloads.
+- CLI hangs (SIGKILL 137) by adding explicit `std::process::exit(0)` and removing conflicting ANSI escape codes.
+- CI shell syntax errors (`sh: 1: Syntax error`) by switching the execution shell from `sh` to `/bin/bash` in `ci-template.yml`.
+- Trivy installation errors in CI by pinning `aquasecurity/setup-trivy` to `v0.2.5`.
+- Environment variable parsing issues in CI via universal quoting in `docker run` commands.
 
 ## [0.1.0] - 2026-02-15
 

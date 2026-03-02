@@ -175,6 +175,9 @@ mod tests {
                 .to_string(),
             force: false,
             report: None,
+            local: false,
+            gh: false,
+            all: false,
         }
     }
 
