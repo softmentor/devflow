@@ -16,7 +16,12 @@ use devflow_core::{DevflowConfig, ExtensionRegistry};
 const EXTENSION_PREFIX: &str = "devflow-ext-";
 
 /// Probes a potential subprocess extension for its capabilities.
-fn discover_and_register(ext_name: String, binary_name: String, registry: &mut ExtensionRegistry) {
+fn discover_and_register(
+    ext_name: String,
+    binary_name: String,
+    registry: &mut ExtensionRegistry,
+    is_trusted: bool,
+) {
     debug!("probing for subprocess extension: {}", binary_name);
 
     let output = match Command::new(&binary_name).arg("--discover").output() {
@@ -48,7 +53,7 @@ fn discover_and_register(ext_name: String, binary_name: String, registry: &mut E
         ext_name, capabilities
     );
 
-    let ext = SubprocessExtension::new(ext_name, binary_name, capabilities);
+    let ext = SubprocessExtension::new(ext_name, binary_name, capabilities, is_trusted);
     registry.register(Box::new(ext));
 }
 
@@ -68,7 +73,9 @@ pub fn discover_subprocess_extensions(
             continue;
         }
         let binary_name = format!("{}{}", EXTENSION_PREFIX, stack);
-        discover_and_register(stack.clone(), binary_name, registry);
+        // Implicitly discovered stack extensions are considered "Trusted" 
+        // as they follow the system naming convention and are usually globally installed tools.
+        discover_and_register(stack.clone(), binary_name, registry, true);
     }
 
     // 2. Explicit discovery from extension config
@@ -81,7 +88,7 @@ pub fn discover_subprocess_extensions(
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|| format!("{}{}", EXTENSION_PREFIX, ext_name));
 
-                discover_and_register(ext_name.clone(), binary_name, registry);
+                discover_and_register(ext_name.clone(), binary_name, registry, ext_cfg.trusted);
             }
         }
     }

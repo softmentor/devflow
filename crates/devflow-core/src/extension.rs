@@ -28,7 +28,12 @@ pub trait Extension: std::fmt::Debug {
     /// The set of command capabilities provided by this extension.
     fn capabilities(&self) -> HashSet<String>;
     /// Maps a command reference to an executable action.
-    fn build_action(&self, cmd: &CommandRef) -> Option<ExecutionAction>;
+    fn build_action(&self, cmd: &CommandRef) -> Result<Option<ExecutionAction>>;
+
+    /// Whether this extension is considered "trusted" to run on the host during negotiation.
+    fn is_trusted(&self) -> bool {
+        false
+    }
 
     /// Returns the host-to-container volume mappings required by this extension.
     /// Expected format: `host_relative_dir:container_absolute_dir`
@@ -76,6 +81,11 @@ impl ExtensionRegistry {
     pub fn register(&mut self, extension: Box<dyn Extension>) {
         self.extensions
             .insert(extension.name().to_string(), extension);
+    }
+
+    /// Retrieves an extension by name.
+    pub fn get(&self, name: &str) -> Option<&dyn Extension> {
+        self.extensions.get(name).map(|boxed| boxed.as_ref())
     }
 
     /// Verifies if any registered extension can handle the given command.
@@ -138,16 +148,19 @@ impl ExtensionRegistry {
     }
 
     /// Builds the execution arguments for a command against a specific extension.
-    pub fn build_action(&self, name: &str, cmd: &CommandRef) -> Option<ExecutionAction> {
+    pub fn build_action(&self, name: &str, cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
         if let Some(ext) = self.extensions.get(name) {
-            let mut action = ext.build_action(cmd)?;
+            let mut action = match ext.build_action(cmd)? {
+                Some(a) => a,
+                None => return Ok(None),
+            };
             // Merge extension global envs with action-specific envs
             let mut merged_env = ext.env_vars();
             merged_env.extend(action.env);
             action.env = merged_env;
-            Some(action)
+            Ok(Some(action))
         } else {
-            None
+            Ok(None)
         }
     }
 

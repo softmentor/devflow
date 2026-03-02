@@ -161,6 +161,9 @@ pub struct ExtensionConfig {
     /// Whether this extension is required for project operations.
     #[serde(default)]
     pub required: bool,
+    /// Whether this extension is trusted to run on the host during negotiation.
+    #[serde(default)]
+    pub trusted: bool,
 }
 
 /// Source types for extensions.
