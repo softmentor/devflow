@@ -4,9 +4,9 @@
 //! `cargo` commands, enabling Rust workflows to integrate transparently
 //! into the Devflow ecosystem.
 
-use devflow_core::{CommandRef, ExecutionAction, Extension};
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
+use devflow_core::{CommandRef, ExecutionAction, Extension};
+use std::collections::HashSet;
 
 /// The Devflow extension for Rust.
 ///
@@ -50,7 +50,7 @@ impl Extension for RustExtension {
         .collect()
     }
 
-    fn build_action(&self, cmd: &CommandRef) -> anyhow::Result<Option<ExecutionAction>> {
+    fn build_action(&self, cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
         let primary = cmd.primary.as_str();
         let selector = cmd.selector.as_deref().unwrap_or("");
 
@@ -191,7 +191,8 @@ mod tests {
         for (input_cmd, expected_shell) in tests {
             let action = ext
                 .build_action(&input_cmd)
-                .expect("Expected valid action mapping");
+                .expect("Expected valid action mapping")
+                .expect("Expected command to map to an action");
             let actual_shell = format!("{} {}", action.program, action.args.join(" "));
             assert_eq!(actual_shell, expected_shell);
         }
@@ -207,7 +208,10 @@ mod tests {
         ];
 
         for input_cmd in invalid_cmds {
-            assert!(ext.build_action(&input_cmd).is_none());
+            assert!(ext
+                .build_action(&input_cmd)
+                .expect("mapping should not error")
+                .is_none());
         }
     }
 }
