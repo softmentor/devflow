@@ -44,3 +44,4 @@ Devflow turns this into a config-defined contract that can be executed and valid
 4. [Getting Started](#devflow.user-guide.getting-started)
 5. [Configuration](#devflow.user-guide.configuration)
 6. [New Stacks (Kotlin Example)](#devflow.user-guide.new-stacks)
+7. [Repository Standardization Setup](#devflow.user-guide.repository-standardization)

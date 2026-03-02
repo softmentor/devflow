@@ -15,6 +15,7 @@ project:
         - file: user-guide/multi-stack.md
         - file: user-guide/custom-extensions.md
         - file: user-guide/ci-workflows.md
+        - file: user-guide/repository-standardization.md
         - file: user-guide/troubleshooting.md
     - title: Developer Guide
       file: developer-guide/developer-index.md
