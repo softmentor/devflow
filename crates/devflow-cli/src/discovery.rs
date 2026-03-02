@@ -43,7 +43,10 @@ fn discover_and_register(
     let capabilities: HashSet<String> = match serde_json::from_slice(&output.stdout) {
         Ok(caps) => caps,
         Err(e) => {
-            warn!("failed to parse capabilities for extension '{}': {}", ext_name, e);
+            warn!(
+                "failed to parse capabilities for extension '{}': {}",
+                ext_name, e
+            );
             return;
         }
     };
