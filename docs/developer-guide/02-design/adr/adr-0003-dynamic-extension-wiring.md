@@ -2,7 +2,8 @@
 title: ADR-0003 Dynamic Extension Wiring and Subprocess Execution
 label: devflow.developer-guide.design.adr-0003
 date: 2026-02-27
-status: accepted
+options:
+    status: accepted
 ---
 
 # ADR-0003: Dynamic Extension Wiring and Subprocess Execution

@@ -178,4 +178,41 @@ if "--build-action" in sys.argv:
         let action = ext.build_action(&cmd).expect("RPC failed");
         assert!(action.is_none());
     }
+
+    #[test]
+    fn is_trusted_returns_constructor_value() {
+        let trusted_ext = SubprocessExtension::new(
+            "trusted".to_string(),
+            "/dev/null".to_string(),
+            HashSet::new(),
+            true,
+        );
+        assert!(trusted_ext.is_trusted());
+
+        let untrusted_ext = SubprocessExtension::new(
+            "untrusted".to_string(),
+            "/dev/null".to_string(),
+            HashSet::new(),
+            false,
+        );
+        assert!(!untrusted_ext.is_trusted());
+    }
+
+    #[test]
+    fn binary_not_found_returns_ok_none() {
+        let ext = SubprocessExtension::new(
+            "ghost".to_string(),
+            "/tmp/nonexistent-devflow-binary-12345".to_string(),
+            HashSet::from(["test".to_string()]),
+            false,
+        );
+
+        let cmd = CommandRef {
+            primary: PrimaryCommand::Test,
+            selector: None,
+        };
+
+        let result = ext.build_action(&cmd).expect("should not error");
+        assert!(result.is_none(), "missing binary should return Ok(None)");
+    }
 }

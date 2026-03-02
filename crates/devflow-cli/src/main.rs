@@ -582,4 +582,50 @@ mod tests {
         let content = fs::read_to_string(&ci_path).unwrap();
         assert!(content.contains("test:unit"));
     }
+
+    #[test]
+    fn get_dir_size_nonexistent_returns_zero() {
+        assert_eq!(
+            get_dir_size(Path::new("/tmp/nonexistent-devflow-dir-xyz")),
+            0
+        );
+    }
+
+    #[test]
+    fn get_dir_size_computes_recursive_size() {
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("sub");
+        fs::create_dir_all(&sub).unwrap();
+
+        // Write files with known content sizes
+        fs::write(dir.path().join("a.txt"), "hello").unwrap(); // 5 bytes
+        fs::write(sub.join("b.txt"), "world!").unwrap(); // 6 bytes
+
+        let size = get_dir_size(dir.path());
+        assert_eq!(size, 11);
+    }
+
+    #[test]
+    fn get_dir_size_single_file() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("single.bin");
+        fs::write(&file, "1234567890").unwrap(); // 10 bytes
+
+        assert_eq!(get_dir_size(&file), 10);
+    }
+
+    #[test]
+    fn execute_prune_unknown_selector_fails() {
+        let cfg = test_cfg();
+        let registry = ExtensionRegistry::default();
+        let cmd = CommandRef::from_str("prune:unknown").unwrap();
+        let cli = test_cli("none");
+
+        let result = execute(&cli, &cfg, &registry, &cmd);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("unknown prune selector"));
+    }
 }

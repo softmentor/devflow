@@ -9,6 +9,15 @@ clean:
 setup-tools:
 	cargo install cargo-llvm-cov
 	cargo install cargo-criterion
+	@if ! command -v terraform >/dev/null 2>&1; then \
+		echo "📦 Installing Terraform..."; \
+		if command -v brew >/dev/null 2>&1; then \
+			brew tap hashicorp/tap; \
+			brew install hashicorp/tap/terraform; \
+		else \
+			echo "⚠️  Homebrew not found. Please install Terraform manually: https://developer.hashicorp.com/terraform/downloads"; \
+		fi \
+	fi
 
 fmt:
 	cargo run -p devflow-cli -- fmt:fix
@@ -124,7 +133,7 @@ scan:
 		echo "   Visit: https://aquasecurity.github.io/trivy/latest/getting-started/installation/"; \
 	fi
 
-# Deep clean and environment reset
+# Tearing down Devflow environment
 teardown:
 	@echo "🧹 Tearing down Devflow environment..."
 	rm -rf .cargo-cache target/ci ci-image.tar
@@ -137,3 +146,16 @@ teardown:
 		docker volume prune -f; \
 	fi
 	@echo "✨ Teardown complete."
+
+# GitHub Repository Settings management via Terraform
+gh-setup:
+	@if ! command -v terraform >/dev/null 2>&1; then \
+		echo "❌ Error: Terraform is not installed. Run 'make setup-tools' to install it."; \
+		exit 1; \
+	fi
+	@echo "📡 Setting up GitHub repository settings..."
+	@cd .github/settings/terraform && \
+		terraform init && \
+		terraform plan && \
+		echo "---" && \
+		echo "To apply changes, run: cd .github/settings/terraform && terraform apply"

@@ -63,6 +63,24 @@ Devflow commands are categorized by their role in the developer lifecycle.
 | `package:artifact` | Build and bundle project distribution artifacts | |
 | `release:candidate` | Tag and prepare a new release candidate | |
 
+#### `make gh-setup` - GitHub Administration
+
+Devflow provides Infrastructure-as-Code (Terraform) for managing GitHub repository settings.
+
+- **Action:** Initializes Terraform in `.github/settings/terraform` and generates a plan for repository settings, branch protection, and security policies.
+- **Requirement:** Requires `terraform` (automatically installed via `make setup-tools` on macOS).
+- **Files Managed:**
+  - Repository metadata (description, features)
+  - Branch protection rules for `main`
+  - Required status checks (matching `ci.yml`)
+
+#### `Community Standards`
+
+The project includes standard GitHub community files in the root and `.github` directory:
+- **Found in `.github/ISSUE_TEMPLATE/`**: Structured templates for Bugs, Features, and Security Incidents.
+- **Found in root**: `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+- **Found in `.github/`**: `SECURITY.md`, `CODEOWNERS`, and `dependabot.yml`.
+
 #### `make teardown` - Environment Reset
 
 While `dwf` handles logic-level caches, the root `Makefile` provides a `teardown` target for a "scorched earth" local reset.

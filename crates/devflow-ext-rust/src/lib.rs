@@ -166,6 +166,7 @@ mod tests {
         assert!(caps.contains("build:release"));
         assert!(caps.contains("test:smoke"));
         assert!(caps.contains("fmt:check"));
+        assert!(caps.contains("lint:security"));
     }
 
     #[test]
@@ -186,6 +187,14 @@ mod tests {
                 "cargo test --tests",
             ),
             (cmd(PrimaryCommand::Fmt, Some("fix")), "cargo fmt --all"),
+            (
+                cmd(PrimaryCommand::Test, Some("unit")),
+                "cargo nextest run --lib --bins",
+            ),
+            (
+                cmd(PrimaryCommand::Lint, Some("security")),
+                "trivy image devflow-ci:latest --severity CRITICAL,HIGH --exit-code 1",
+            ),
         ];
 
         for (input_cmd, expected_shell) in tests {
@@ -213,5 +222,47 @@ mod tests {
                 .expect("mapping should not error")
                 .is_none());
         }
+    }
+
+    #[test]
+    fn is_trusted_returns_true() {
+        let ext = RustExtension::new();
+        assert!(ext.is_trusted());
+    }
+
+    #[test]
+    fn cache_mounts_returns_expected_paths() {
+        let ext = RustExtension::new();
+        let mounts = ext.cache_mounts();
+        assert_eq!(mounts.len(), 2);
+        assert!(mounts.contains(&"rust/cargo:/workspace/.cargo-cache".to_string()));
+        assert!(mounts.contains(&"rust/target:/workspace/target/ci".to_string()));
+    }
+
+    #[test]
+    fn env_vars_returns_expected_values() {
+        let ext = RustExtension::new();
+        let envs = ext.env_vars();
+        assert_eq!(envs.get("CARGO_HOME").unwrap(), "/workspace/.cargo-cache");
+        assert_eq!(
+            envs.get("CARGO_TARGET_DIR").unwrap(),
+            "/workspace/target/ci"
+        );
+        assert_eq!(
+            envs.get("SCCACHE_DIR").unwrap(),
+            "/workspace/.cargo-cache/sccache"
+        );
+        assert_eq!(envs.get("RUSTC_WRAPPER").unwrap(), "sccache");
+        assert_eq!(envs.len(), 4);
+    }
+
+    #[test]
+    fn fingerprint_inputs_returns_expected_files() {
+        let ext = RustExtension::new();
+        let inputs = ext.fingerprint_inputs();
+        assert_eq!(inputs.len(), 3);
+        assert!(inputs.contains(&"Cargo.lock".to_string()));
+        assert!(inputs.contains(&"rust-toolchain.toml".to_string()));
+        assert!(inputs.contains(&"Cargo.toml".to_string()));
     }
 }

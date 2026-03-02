@@ -311,4 +311,146 @@ mod tests {
             .expect_err("Malformed TOML should return an error, not panic");
         assert!(err.to_string().contains("failed to parse TOML"));
     }
+
+    #[test]
+    fn container_engine_defaults_to_auto() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "my-image:latest"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(container.engine, ContainerEngine::Auto);
+    }
+
+    #[test]
+    fn container_engine_docker_variant() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        engine = "docker"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(container.engine, ContainerEngine::Docker);
+    }
+
+    #[test]
+    fn container_config_rejects_unknown_fields() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "my-image:latest"
+        typo_field = "bad"
+        "#;
+
+        let err = toml::from_str::<DevflowConfig>(text).expect_err("must reject unknown field");
+        assert!(err.to_string().contains("typo_field"));
+    }
+
+    #[test]
+    fn cache_config_deserialization() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [cache]
+        root = ".cache/devflow"
+        strategy = "local"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let cache = cfg.cache.expect("cache section should exist");
+        assert_eq!(cache.root.as_deref(), Some(".cache/devflow"));
+        assert_eq!(cache.strategy.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn cache_config_rejects_unknown_fields() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [cache]
+        root = ".cache"
+        typo = "bad"
+        "#;
+
+        let err = toml::from_str::<DevflowConfig>(text).expect_err("must reject unknown field");
+        assert!(err.to_string().contains("typo"));
+    }
+
+    #[test]
+    fn extension_config_trusted_field() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [extensions.python]
+        source = "path"
+        path = "/usr/local/bin/devflow-ext-python"
+        trusted = true
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let extensions = cfg.extensions.expect("extensions should exist");
+        let python = extensions
+            .get("python")
+            .expect("python extension should exist");
+        assert!(python.trusted);
+    }
+
+    #[test]
+    fn extension_config_trusted_defaults_false() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [extensions.python]
+        source = "builtin"
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let extensions = cfg.extensions.expect("extensions should exist");
+        let python = extensions
+            .get("python")
+            .expect("python extension should exist");
+        assert!(!python.trusted);
+    }
+
+    #[test]
+    fn container_fingerprint_inputs_deserialization() {
+        let text = r#"
+        [project]
+        name = "demo"
+        stack = ["rust"]
+
+        [container]
+        image = "ci:latest"
+        fingerprint_inputs = ["Cargo.lock", "rust-toolchain.toml"]
+        "#;
+
+        let cfg = toml::from_str::<DevflowConfig>(text).expect("Valid TOML parse");
+        let container = cfg.container.expect("container section should exist");
+        assert_eq!(
+            container.fingerprint_inputs,
+            vec!["Cargo.lock", "rust-toolchain.toml"]
+        );
+    }
 }

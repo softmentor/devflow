@@ -169,4 +169,37 @@ mod tests {
                 .is_none());
         }
     }
+
+    #[test]
+    fn is_trusted_returns_true() {
+        let ext = NodeExtension::new();
+        assert!(ext.is_trusted());
+    }
+
+    #[test]
+    fn cache_mounts_returns_expected_paths() {
+        let ext = NodeExtension::new();
+        let mounts = ext.cache_mounts();
+        assert_eq!(mounts.len(), 1);
+        assert_eq!(mounts[0], "node/npm:/root/.npm");
+    }
+
+    #[test]
+    fn env_vars_returns_expected_values() {
+        let ext = NodeExtension::new();
+        let envs = ext.env_vars();
+        assert_eq!(envs.get("NPM_CONFIG_CACHE").unwrap(), "/root/.npm");
+        assert_eq!(envs.len(), 1);
+    }
+
+    #[test]
+    fn fingerprint_inputs_returns_expected_files() {
+        let ext = NodeExtension::new();
+        let inputs = ext.fingerprint_inputs();
+        assert_eq!(inputs.len(), 4);
+        assert!(inputs.contains(&"package-lock.json".to_string()));
+        assert!(inputs.contains(&"yarn.lock".to_string()));
+        assert!(inputs.contains(&"pnpm-lock.yaml".to_string()));
+        assert!(inputs.contains(&"package.json".to_string()));
+    }
 }
