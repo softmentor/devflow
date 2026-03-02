@@ -88,9 +88,10 @@ impl Extension for SubprocessExtension {
             return Ok(None);
         }
 
-        let action = serde_json::from_slice::<ExecutionAction>(&output.stdout)
-            .map_err(|e| anyhow::anyhow!("failed to parse ExecutionAction from {}: {}", self.name, e))?;
-        
+        let action = serde_json::from_slice::<ExecutionAction>(&output.stdout).map_err(|e| {
+            anyhow::anyhow!("failed to parse ExecutionAction from {}: {}", self.name, e)
+        })?;
+
         Ok(Some(action))
     }
 
@@ -148,7 +149,10 @@ if "--build-action" in sys.argv:
             selector: None,
         };
 
-        let action = ext.build_action(&cmd).expect("RPC failed").expect("should return action");
+        let action = ext
+            .build_action(&cmd)
+            .expect("RPC failed")
+            .expect("should return action");
         assert_eq!(action.program, "echo");
         assert_eq!(action.args, vec!["mock-test".to_string()]);
     }

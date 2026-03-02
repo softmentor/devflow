@@ -4,8 +4,8 @@
 //! `npm` commands, enabling JavaScript/TypeScript workflows to integrate transparently
 //! into the Devflow ecosystem.
 
-use devflow_core::{CommandRef, ExecutionAction, Extension};
 use anyhow::Result;
+use devflow_core::{CommandRef, ExecutionAction, Extension};
 use std::collections::HashSet;
 
 /// The Devflow extension for Node.js.
@@ -146,7 +146,8 @@ mod tests {
         for (input_cmd, expected_shell) in tests {
             let action = ext
                 .build_action(&input_cmd)
-                .expect("Expected valid action mapping");
+                .expect("Expected valid action mapping")
+                .expect("Expected command to map to an action");
             let actual_shell = format!("{} {}", action.program, action.args.join(" "));
             assert_eq!(actual_shell, expected_shell);
         }
@@ -162,7 +163,10 @@ mod tests {
         ];
 
         for input_cmd in invalid_cmds {
-            assert!(ext.build_action(&input_cmd).is_none());
+            assert!(ext
+                .build_action(&input_cmd)
+                .expect("mapping should not error")
+                .is_none());
         }
     }
 }

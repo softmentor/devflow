@@ -200,8 +200,8 @@ mod tests {
             self.capabilities.clone()
         }
 
-        fn build_action(&self, _cmd: &CommandRef) -> Option<ExecutionAction> {
-            self.action.clone()
+        fn build_action(&self, _cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
+            Ok(self.action.clone())
         }
     }
 
@@ -225,11 +225,11 @@ mod tests {
             selector: None,
         };
 
-        let action = registry.build_action("mock", &cmd).unwrap();
+        let action = registry.build_action("mock", &cmd).unwrap().unwrap();
         assert_eq!(action.program, "echo");
         assert_eq!(action.args, vec!["hello"]);
 
-        let missing = registry.build_action("nonexistent", &cmd);
+        let missing = registry.build_action("nonexistent", &cmd).unwrap();
         assert!(missing.is_none());
     }
 

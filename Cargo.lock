@@ -342,6 +342,7 @@ dependencies = [
 name = "devflow-ext-node"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "devflow-core",
 ]
 
@@ -349,6 +350,7 @@ dependencies = [
 name = "devflow-ext-rust"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "devflow-core",
 ]
 

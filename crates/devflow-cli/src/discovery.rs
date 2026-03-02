@@ -73,7 +73,7 @@ pub fn discover_subprocess_extensions(
             continue;
         }
         let binary_name = format!("{}{}", EXTENSION_PREFIX, stack);
-        // Implicitly discovered stack extensions are considered "Trusted" 
+        // Implicitly discovered stack extensions are considered "Trusted"
         // as they follow the system naming convention and are usually globally installed tools.
         discover_and_register(stack.clone(), binary_name, registry, true);
     }
@@ -196,6 +196,9 @@ exit 1
         let cmd = CommandRef::from_str("test").unwrap();
         // Since the registry is empty, `ensure_can_run` might return Ok(()) to allow bootstrap,
         // but `build_action` for a specific named builtin extension like "rust" or an unregistered one will be None
-        assert!(registry.build_action("rust", &cmd).is_none());
+        assert!(registry
+            .build_action("rust", &cmd)
+            .expect("registry lookup should not error")
+            .is_none());
     }
 }
