@@ -48,6 +48,7 @@ jobs:
 
       - name: Cache CI Image Tar
         if: steps.check.outputs.available == 'true'
+        id: image_cache
         uses: actions/cache@v4
         with:
           path: ci-image.tar

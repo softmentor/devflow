@@ -20,6 +20,7 @@ What it does:
 - generates workflow YAML based on current config (`targets.pr`)
 - writes to `.github/workflows/ci.yml` by default
 - overwrites existing file content with the latest generated contract
+- includes cache-hit aware image build/scan gating via `image_cache` step outputs
 
 If you modify config locally and run `ci:generate` again, it re-syncs the workflow file.
 

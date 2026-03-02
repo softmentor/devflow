@@ -73,9 +73,15 @@ pub fn discover_subprocess_extensions(
             continue;
         }
         let binary_name = format!("{}{}", EXTENSION_PREFIX, stack);
-        // Implicitly discovered stack extensions are considered "Trusted"
-        // as they follow the system naming convention and are usually globally installed tools.
-        discover_and_register(stack.clone(), binary_name, registry, true);
+        // Security default: implicitly discovered extensions are untrusted unless
+        // explicitly opted in via `[extensions.<name>] trusted = true`.
+        let is_trusted = cfg
+            .extensions
+            .as_ref()
+            .and_then(|extensions| extensions.get(stack))
+            .map(|ext_cfg| ext_cfg.trusted)
+            .unwrap_or(false);
+        discover_and_register(stack.clone(), binary_name, registry, is_trusted);
     }
 
     // 2. Explicit discovery from extension config
@@ -169,6 +175,10 @@ exit 1
 
         let cmd_fmt = CommandRef::from_str("fmt").unwrap();
         assert!(registry.ensure_can_run(&cmd_fmt).is_ok());
+        assert!(!registry
+            .get("python")
+            .expect("python extension should be registered")
+            .is_trusted());
     }
 
     #[test]
