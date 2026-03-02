@@ -49,6 +49,7 @@ project:
           children:
             - file: developer-guide/04-infrastructure/overview.md
             - file: developer-guide/04-infrastructure/ci.md
+            - file: developer-guide/04-infrastructure/repository-standardization.md
         - title: 05 Operations
           children:
             - file: developer-guide/05-operations/troubleshooting.md
