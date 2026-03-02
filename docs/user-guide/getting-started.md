@@ -48,6 +48,14 @@ What this writes:
 - `devflow.toml`
 - `.github/workflows/ci.yml`
 
+### Secure by Default
+Every project initialized with `dwf init` is automatically "Hardened-by-Default":
+- **Vulnerability Scanning**: Integrated Trivy gates for dependencies and containers.
+- **Non-Root Execution**: Containers run as a non-privileged `dwfuser`.
+- **Least Privilege**: GitHub Actions `GITHUB_TOKEN` restricted to `contents: read`.
+
+See the [Security and Hardening Deep Dive](file:///Users/jinythattil/jt/code/softmentor/devflow/docs/developer-guide/02-design/security-and-hardening.md) for more details.
+
 Use `--force` to overwrite existing files:
 
 ```bash
