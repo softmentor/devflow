@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-03-01
+## [0.2.0] - 2026-03-02
 
 ### Added
 - **Container Execution**: Support for running Devflow tasks inside isolated containers (Docker/Podman).
@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vulnerability Scanning**: Integrated Trivy automated scanning into the CI pipeline to fail on CRITICAL/HIGH CVEs.
 - **Local Security Scan**: Added `make scan` and `dwf check:security` for local vulnerability detection via Trivy.
 - **Environmental Cleanup**: Added `make teardown` and `dwf prune:*` commands for localized and remote (GHA) cache/run management.
+- **GitHub Repository Standardization**: Added Terraform (HCL) management for repository settings, branch protection, and security policies.
+- **`make gh-setup`**: Automated initialization and planning for GitHub repository infrastructure-as-code.
+- **Community Templates**: Added structured issue templates (YAML forms) for Bug Reports, Feature Requests, and Security Incidents.
+- **Project Governance**: Added `CODEOWNERS`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and automated `dependabot.yml` policy.
+- **Automated Tooling Setup**: `make setup-tools` now automatically prepares the Terraform toolchain on macOS.
 
 ### Changed
 - Refactored `executor.rs` for modular container orchestration.

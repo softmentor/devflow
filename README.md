@@ -57,3 +57,12 @@ Selectors:
 - `test:unit`, `test:integration`, `test:smoke`
 - `check:pr`, `check:main`, `check:release`
 - `ci:generate`, `ci:check`, `ci:plan`
+
+## Governance & Community
+
+Devflow is built for modern engineering standards.
+
+- **Infrastructure as Code**: Repository settings and branch protection are managed via Terraform in `.github/settings/terraform`.
+- **Security & Hardening**: Every stack is hardened-by-default with non-root execution and automated vulnerability scanning.
+- **Reporting**: Use the **Security tab** in GitHub to report vulnerabilities using the provided incident template.
+- **Participation**: See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
