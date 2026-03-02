@@ -40,7 +40,7 @@ jobs:
 
       - name: Cache Docker Layers
         if: steps.check.outputs.available == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: buildx-${{ runner.os }}-${{ hashFiles('Dockerfile.devflow') }}
@@ -49,7 +49,7 @@ jobs:
       - name: Cache CI Image Tar
         if: steps.check.outputs.available == 'true'
         id: image_cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ci-image.tar
           key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
@@ -125,7 +125,7 @@ jobs:
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ci-image.tar
           key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
@@ -135,7 +135,7 @@ jobs:
         run: docker load -i ci-image.tar
 
       - name: Restore Cargo Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cargo-cache/registry
@@ -183,7 +183,7 @@ jobs:
 
       - name: Restore CI Image Tar
         if: needs.prep.outputs.image_available == 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ci-image.tar
           key: docker-ci-v3-${{ hashFiles('Dockerfile.devflow') }}
@@ -193,7 +193,7 @@ jobs:
         run: docker load -i ci-image.tar
 
       - name: Restore Cargo Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             .cargo-cache/registry
