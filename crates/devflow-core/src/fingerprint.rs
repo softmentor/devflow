@@ -69,4 +69,36 @@ mod tests {
         let mutated_hash = compute_fingerprint(dir.path(), &inputs).unwrap();
         assert_ne!(hash1, mutated_hash);
     }
+
+    #[test]
+    fn input_order_independence() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.lock"), b"content-a").unwrap();
+        std::fs::write(dir.path().join("b.toml"), b"content-b").unwrap();
+
+        let inputs_ab = vec!["a.lock".to_string(), "b.toml".to_string()];
+        let inputs_ba = vec!["b.toml".to_string(), "a.lock".to_string()];
+
+        let hash_ab = compute_fingerprint(dir.path(), &inputs_ab).unwrap();
+        let hash_ba = compute_fingerprint(dir.path(), &inputs_ba).unwrap();
+
+        assert_eq!(hash_ab, hash_ba, "fingerprint must be order-independent");
+    }
+
+    #[test]
+    fn empty_inputs_produces_valid_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let hash = compute_fingerprint(dir.path(), &[]).unwrap();
+        // SHA256 hex string is always 64 chars
+        assert_eq!(hash.len(), 64);
+    }
+
+    #[test]
+    fn hash_is_valid_hex_sha256() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("test.lock"), b"content").unwrap();
+        let hash = compute_fingerprint(dir.path(), &["test.lock".to_string()]).unwrap();
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
 }

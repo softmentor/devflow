@@ -480,4 +480,156 @@ mod tests {
         assert!(!out.env.contains_key("RUSTC_WRAPPER"));
         assert_eq!(out.env.get("CI").map(String::as_str), Some("true"));
     }
+
+    #[test]
+    fn parse_mount_valid_splits() {
+        assert_eq!(parse_mount("a:b"), Some(("a", "b")));
+        assert_eq!(
+            parse_mount("rust/cargo:/workspace/.cargo"),
+            Some(("rust/cargo", "/workspace/.cargo"))
+        );
+        assert_eq!(
+            parse_mount("node/npm:/root/.npm"),
+            Some(("node/npm", "/root/.npm"))
+        );
+    }
+
+    #[test]
+    fn parse_mount_rejects_invalid() {
+        assert!(parse_mount("").is_none());
+        assert!(parse_mount("no-colon").is_none());
+        assert!(parse_mount("a:b:c").is_none());
+    }
+
+    #[test]
+    fn resolve_cache_root_absolute_passthrough() {
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig::default(),
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: None,
+            container: None,
+            cache: None,
+            source_dir: None,
+        };
+        let result = resolve_cache_root(&cfg, "/absolute/path");
+        assert_eq!(result, PathBuf::from("/absolute/path"));
+    }
+
+    #[test]
+    fn resolve_cache_root_relative_anchored_to_source_dir() {
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig::default(),
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: None,
+            container: None,
+            cache: None,
+            source_dir: Some(PathBuf::from("/project")),
+        };
+        let result = resolve_cache_root(&cfg, ".cache/devflow");
+        assert_eq!(result, PathBuf::from("/project/.cache/devflow"));
+    }
+
+    // Mock extension that returns is_trusted() = false for trust enforcement testing.
+    #[derive(Debug)]
+    struct UntrustedMockExtension;
+
+    impl devflow_core::Extension for UntrustedMockExtension {
+        fn name(&self) -> &str {
+            "python"
+        }
+        fn capabilities(&self) -> std::collections::HashSet<String> {
+            std::collections::HashSet::from(["test:unit".to_string()])
+        }
+        fn build_action(&self, _cmd: &CommandRef) -> anyhow::Result<Option<ExecutionAction>> {
+            Ok(Some(ExecutionAction {
+                program: "echo".to_string(),
+                args: vec!["test".to_string()],
+                env: std::collections::HashMap::new(),
+            }))
+        }
+        fn is_trusted(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn trust_enforcement_bails_for_untrusted_extension() {
+        use devflow_core::config::{ExtensionConfig, ExtensionSource};
+        use devflow_core::runtime::RuntimeProfile;
+
+        let mut extensions = std::collections::HashMap::new();
+        extensions.insert(
+            "python".to_string(),
+            ExtensionConfig {
+                source: ExtensionSource::Path,
+                path: Some(PathBuf::from("/usr/local/bin/devflow-ext-python")),
+                version: None,
+                api_version: None,
+                capabilities: vec![],
+                required: false,
+                trusted: false,
+            },
+        );
+
+        let cfg = DevflowConfig {
+            project: devflow_core::config::ProjectConfig {
+                name: "trust-test".to_string(),
+                stack: vec![],
+            },
+            runtime: devflow_core::config::RuntimeConfig {
+                profile: RuntimeProfile::Container,
+            },
+            targets: devflow_core::config::TargetsConfig {
+                profiles: std::collections::HashMap::new(),
+            },
+            extensions: Some(extensions),
+            container: None,
+            cache: None,
+            source_dir: None,
+        };
+
+        let mut registry = ExtensionRegistry::default();
+        registry.register(Box::new(UntrustedMockExtension));
+
+        let command = cmd(PrimaryCommand::Test, Some("unit"));
+        let result = run(&cfg, &registry, &command);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("untrusted extension"),
+            "should bail with untrusted extension message"
+        );
+    }
+
+    #[test]
+    fn sanitize_host_env_drops_workspace_and_root_paths() {
+        let mut env = std::collections::HashMap::new();
+        env.insert("MY_VAR".to_string(), "/workspace/something".to_string());
+        env.insert("OTHER".to_string(), "/root/.config".to_string());
+        env.insert("GOOD".to_string(), "/home/user".to_string());
+
+        let out = sanitize_host_env(ExecutionAction {
+            program: "test".to_string(),
+            args: vec![],
+            env,
+        });
+
+        assert!(!out.env.contains_key("MY_VAR"));
+        assert!(!out.env.contains_key("OTHER"));
+        assert_eq!(out.env.get("GOOD").map(String::as_str), Some("/home/user"));
+    }
 }

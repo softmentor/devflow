@@ -280,4 +280,145 @@ mod tests {
         };
         assert!(registry.ensure_can_run(&cmd_unsupported_selector).is_err());
     }
+
+    #[test]
+    fn get_returns_registered_extension() {
+        let mut registry = ExtensionRegistry::default();
+        let ext = MockExtension {
+            name: "test-ext".to_string(),
+            capabilities: HashSet::new(),
+            action: None,
+        };
+        registry.register(Box::new(ext));
+
+        assert!(registry.get("test-ext").is_some());
+        assert_eq!(registry.get("test-ext").unwrap().name(), "test-ext");
+        assert!(registry.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn is_trusted_default_returns_false() {
+        let ext = MockExtension {
+            name: "untrusted".to_string(),
+            capabilities: HashSet::new(),
+            action: None,
+        };
+        // The default trait impl for is_trusted() returns false.
+        // MockExtension does not override it, so it should be false.
+        assert!(!ext.is_trusted());
+    }
+
+    // A configurable mock that lets tests control all Extension trait methods.
+    #[derive(Debug)]
+    struct ConfigurableMockExtension {
+        ext_name: String,
+        capabilities: HashSet<String>,
+        action: Option<ExecutionAction>,
+        trusted: bool,
+        mounts: Vec<String>,
+        envs: HashMap<String, String>,
+    }
+
+    impl Extension for ConfigurableMockExtension {
+        fn name(&self) -> &str {
+            &self.ext_name
+        }
+        fn capabilities(&self) -> HashSet<String> {
+            self.capabilities.clone()
+        }
+        fn build_action(&self, _cmd: &CommandRef) -> Result<Option<ExecutionAction>> {
+            Ok(self.action.clone())
+        }
+        fn is_trusted(&self) -> bool {
+            self.trusted
+        }
+        fn cache_mounts(&self) -> Vec<String> {
+            self.mounts.clone()
+        }
+        fn env_vars(&self) -> HashMap<String, String> {
+            self.envs.clone()
+        }
+    }
+
+    #[test]
+    fn all_cache_mounts_aggregates_and_deduplicates() {
+        let mut registry = ExtensionRegistry::default();
+
+        registry.register(Box::new(ConfigurableMockExtension {
+            ext_name: "rust".to_string(),
+            capabilities: HashSet::new(),
+            action: None,
+            trusted: true,
+            mounts: vec![
+                "rust/cargo:/workspace/.cargo".to_string(),
+                "shared:/cache".to_string(),
+            ],
+            envs: HashMap::new(),
+        }));
+
+        registry.register(Box::new(ConfigurableMockExtension {
+            ext_name: "node".to_string(),
+            capabilities: HashSet::new(),
+            action: None,
+            trusted: true,
+            mounts: vec![
+                "node/npm:/root/.npm".to_string(),
+                "shared:/cache".to_string(), // duplicate
+            ],
+            envs: HashMap::new(),
+        }));
+
+        let mounts = registry.all_cache_mounts();
+        // Deduplicated: "shared:/cache" appears once
+        assert_eq!(mounts.len(), 3);
+        // Sorted alphabetically
+        assert_eq!(mounts[0], "node/npm:/root/.npm");
+        assert_eq!(mounts[1], "rust/cargo:/workspace/.cargo");
+        assert_eq!(mounts[2], "shared:/cache");
+    }
+
+    #[test]
+    fn build_action_merges_env_vars_with_action_override() {
+        let mut registry = ExtensionRegistry::default();
+
+        let mut ext_envs = HashMap::new();
+        ext_envs.insert("CARGO_HOME".to_string(), "/default/cargo".to_string());
+        ext_envs.insert("CI".to_string(), "true".to_string());
+
+        let mut action_envs = HashMap::new();
+        action_envs.insert("CARGO_HOME".to_string(), "/override/cargo".to_string());
+        action_envs.insert("EXTRA".to_string(), "value".to_string());
+
+        registry.register(Box::new(ConfigurableMockExtension {
+            ext_name: "rust".to_string(),
+            capabilities: HashSet::new(),
+            action: Some(ExecutionAction {
+                program: "cargo".to_string(),
+                args: vec!["build".to_string()],
+                env: action_envs,
+            }),
+            trusted: true,
+            mounts: Vec::new(),
+            envs: ext_envs,
+        }));
+
+        let cmd = CommandRef {
+            primary: PrimaryCommand::Build,
+            selector: None,
+        };
+
+        let action = registry.build_action("rust", &cmd).unwrap().unwrap();
+        // Action-level env overrides extension-level
+        assert_eq!(action.env.get("CARGO_HOME").unwrap(), "/override/cargo");
+        // Extension-level env is preserved when not overridden
+        assert_eq!(action.env.get("CI").unwrap(), "true");
+        // Action-specific env is preserved
+        assert_eq!(action.env.get("EXTRA").unwrap(), "value");
+    }
+
+    #[test]
+    fn all_cache_mounts_empty_when_no_extensions() {
+        let registry = ExtensionRegistry::default();
+        assert!(registry.all_cache_mounts().is_empty());
+    }
 }

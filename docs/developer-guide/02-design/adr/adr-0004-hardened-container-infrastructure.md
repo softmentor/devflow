@@ -2,7 +2,8 @@
 title: ADR-0004 Hardened Container Infrastructure
 label: devflow.developer-guide.design.adr-0004
 date: 2026-03-01
-status: accepted
+options:
+    status: accepted
 ---
 
 # ADR-0004: Hardened Container Infrastructure

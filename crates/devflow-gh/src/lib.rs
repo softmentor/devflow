@@ -127,4 +127,41 @@ mod tests {
         let err = check_workflow(&cfg, broken).expect_err("must fail");
         assert!(err.to_string().contains("missing required 'build' job"));
     }
+
+    #[test]
+    fn check_fails_when_verify_job_missing() {
+        let cfg = fixture();
+        let workflow =
+            "name: ci\n\njobs:\n  prep:\n  build:\n    needs: [prep]\n  dwf --report\n wait\n";
+        let err = check_workflow(&cfg, workflow).expect_err("must fail");
+        assert!(err.to_string().contains("missing required 'verify' job"));
+    }
+
+    #[test]
+    fn check_fails_when_dwf_report_missing() {
+        let cfg = fixture();
+        let workflow =
+            "name: ci\n\njobs:\n  prep:\n  build:\n    needs: [prep]\n  verify:\n    Verify\n wait\n";
+        let err = check_workflow(&cfg, workflow).expect_err("must fail");
+        assert!(err.to_string().contains("dwf --report"));
+    }
+
+    #[test]
+    fn check_fails_when_wait_missing() {
+        let cfg = fixture();
+        let workflow =
+            "name: ci\n\njobs:\n  prep:\n  build:\n    needs: [prep]\n  verify:\n    dwf --report\n";
+        let err = check_workflow(&cfg, workflow).expect_err("must fail");
+        assert!(err.to_string().contains("wait"));
+    }
+
+    #[test]
+    fn rendered_output_contains_project_name() {
+        let cfg = fixture();
+        let out = render_workflow(&cfg).expect("render should pass");
+        assert!(
+            out.contains("demo"),
+            "rendered output should contain project name"
+        );
+    }
 }
