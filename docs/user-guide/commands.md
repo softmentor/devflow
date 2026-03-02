@@ -56,12 +56,47 @@ Devflow commands are categorized by their role in the developer lifecycle.
 | `ci:plan` | Preview the CI execution strategy and profiles |
 
 ### Maintenance & Release
-| Command | Description |
-| --- | --- |
-| `prune:cache` | Cleanup local or GHA caches (use `--local`, `--gh`, `--all`) |
-| `prune:runs` | Clean up stale GHA workflow runs (use `--gh`) |
-| `package:artifact` | Build and bundle project distribution artifacts |
-| `release:candidate` | Tag and prepare a new release candidate |
+| Command | Description | Flags |
+| --- | --- | --- |
+| `prune:cache` | Cleanup local or GHA caches | `--local`, `--gh`, `--all`, `--force` |
+| `prune:runs` | Clean up stale GHA workflow runs | `--gh`, `--all` |
+| `package:artifact` | Build and bundle project distribution artifacts | |
+| `release:candidate` | Tag and prepare a new release candidate | |
+
+#### `make teardown` - Environment Reset
+
+While `dwf` handles logic-level caches, the root `Makefile` provides a `teardown` target for a "scorched earth" local reset.
+
+- **Action:**
+  - Deletes `.cargo-cache`, `target/ci`, and `ci-image.tar`.
+  - **Container Pruning:** Automatically detects `podman` or `docker` and runs `system prune -f` and `volume prune -f`.
+- **Use Case:** Use this when you need to completely refresh the container engine state or clear up major disk space occupied by untagged images.
+
+#### `prune:cache` - Deep Dive
+
+This command is used to reclaim disk space or reset CI state. It supports granular target selection via flags.
+
+**Local Pruning (`--local` or `--all`):**
+- **Directories pruned:**
+    - The directory set in `cache.root` in `devflow.toml` (defaults to `.cargo-cache`).
+    - `target/ci`: The staging directory for CI-localized builds and images.
+- **Reporting:** Displays total MB reclaimed.
+
+**GitHub Actions Pruning (`--gh` or `--all`):**
+- **Standard logic:**
+    - Removes PR caches (`refs/pull/*`) older than 24 hours.
+    - If total GH storage exceeds 8GB, it performs "LIFO" pruning on cargo caches (keeps the latest for each ref).
+- **Force logic (`--force`):** Purges **all** caches for the repository immediately.
+- **Requirement:** Requires the `gh` CLI to be installed and authenticated.
+
+#### `prune:runs` - Deep Dive
+
+Cleans up the GitHub Actions execution history. Requires `--gh` or `--all`.
+
+- **Action:**
+    - Automatically deletes all **Failed** and **Cancelled** runs.
+    - Retains the **100 most recent** successful/completed runs, deleting everything older.
+- **Requirement:** Requires the `gh` CLI.
 
 ## Common Selectors
 
