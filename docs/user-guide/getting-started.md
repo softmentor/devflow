@@ -132,6 +132,22 @@ make gh-setup
 This will:
 - Initialize Terraform in `.github/settings/terraform`.
 - Preview changes for branch protection, required status checks, and security settings.
-- Guide you on how to apply these settings using `terraform apply`.
+
+### Import, Plan & Apply
+
+If you're working with an existing repo, you may need to import it first:
+
+```bash
+cd .github/settings/terraform
+terraform init
+terraform import github_repository.devflow devflow
+```
+
+Then preview and apply:
+
+```bash
+terraform plan
+terraform apply
+```
 
 Additionally, structured issue templates and community policies are now available in your `.github` directory and repository root.

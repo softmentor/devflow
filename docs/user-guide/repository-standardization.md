@@ -27,6 +27,16 @@ When you run `dwf init`, Devflow populates the `.github/settings/terraform` dire
 - `provider.tf`: Configures the GitHub provider connection.
 - `repository.tf`: Defines branch protection, labels, and repository features.
 
+### Importing Existing Repository
+
+If you are standardizing an existing repository, you may need to import it into Terraform state before applying changes:
+
+```bash
+cd .github/settings/terraform
+terraform init
+terraform import github_repository.devflow devflow
+```
+
 ## Step 2: Preview the Configuration
 
 Use the built-in `make` command to preview what changes will be applied to your repository:
@@ -39,12 +49,17 @@ This command will:
 1.  Initialize the Terraform environment.
 2.  Run a `terraform plan` to show the difference between your current repository settings and the Devflow standard.
 
+You can also run this manually:
+
+```bash
+terraform plan
+```
+
 ## Step 3: Apply the Standardization
 
 If you are satisfied with the preview, you can apply the settings:
 
 ```bash
-cd .github/settings/terraform
 terraform apply
 ```
 
