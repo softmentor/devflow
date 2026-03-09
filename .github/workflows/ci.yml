@@ -37,7 +37,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: steps.check.outputs.available == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Cache Docker Layers
         if: steps.check.outputs.available == 'true'
