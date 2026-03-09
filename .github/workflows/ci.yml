@@ -57,7 +57,7 @@ jobs:
 
       - name: Build CI Image (Buildx)
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.devflow
