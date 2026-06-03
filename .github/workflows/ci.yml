@@ -69,7 +69,7 @@ jobs:
 
       - name: Install Trivy
         if: steps.check.outputs.available == 'true' && steps.image_cache.outputs.cache-hit != 'true'
-        uses: aquasecurity/setup-trivy@v0.2.5
+        uses: aquasecurity/setup-trivy@v0.3.1
         with:
           cache: true
 
